@@ -1,0 +1,8 @@
+# Normalise line endings in the repo; check out shell scripts with LF (bash needs it)
+# and PowerShell scripts with CRLF (Windows tooling expects it).
+* text=auto eol=lf
+*.sh  text eol=lf
+*.ps1 text eol=crlf
+*.png binary
+*.icns binary
+*.db binary

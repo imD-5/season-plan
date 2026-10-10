@@ -6,7 +6,7 @@
 
 A weekly menu of 1–2 hour work sessions for one season: thesis, LeetCode, job prep, a side project. It is not
 a timetable. Each week has a short list of sessions; I pick whatever I feel like and tick a box when one is done.
-It runs as a small local server with a SQLite database, and a tiny Mac app shows the board in a window.
+It runs as a small local server with a SQLite database and opens as its own window on macOS and Windows.
 
 ## What it does
 
@@ -22,17 +22,34 @@ It runs as a small local server with a SQLite database, and a tiny Mac app shows
 
 ## Running it
 
-Requires macOS (for the app and notifications), [uv](https://docs.astral.sh/uv/), and Python 3.14.
+Works on **macOS** and **Windows** (Linux runs the server; open the board in a browser). Needs
+[uv](https://docs.astral.sh/uv/); `uv sync` installs Python 3.14 if you don't have it.
+
+**macOS** (Terminal)
 
 ```sh
-uv sync                     # create .venv from uv.lock
-cp .env.example .env        # optional: add TYPESAFE_API_KEY for task sorting
-cp plan.example.py plan.py  # then make it your own: tasks, events, dates
-uv run seed.py              # load plan.py into season.db
-uv run serve.py             # http://127.0.0.1:8765/
-app/install-server.sh       # optional: keep the server running in the background (launchd)
-app/build.sh                # optional: build ~/Applications/Season.app
+uv sync                         # create .venv from uv.lock
+cp .env.example .env            # optional: add TYPESAFE_API_KEY for task sorting
+cp plan.example.py plan.py      # then make it your own: tasks, events, dates
+uv run seed.py                  # load plan.py into season.db
+app/macos/install-server.sh     # run the server in the background, also at login (launchd)
+app/macos/build.sh              # build ~/Applications/Season.app
 ```
+
+**Windows** (PowerShell)
+
+```powershell
+uv sync
+copy .env.example .env
+copy plan.example.py plan.py
+uv run seed.py
+powershell -ExecutionPolicy Bypass -File app\windows\install.ps1   # server at sign-in + "Season" in the Start menu
+```
+
+"Season" opens the board in its own Edge window (no tabs or address bar) and starts the server if it isn't
+running. No admin rights needed. To undo: the same command with `-Remove`.
+
+Without the installers, `uv run serve.py` starts the server and the board is at http://127.0.0.1:8765/.
 
 The plan (weeks, events, types, the numbered problem queue) is plain data in `plan.py`. **It is yours and
 git-ignored** — `plan.example.py` is the generic starting point, and `plan.py` is what the board actually

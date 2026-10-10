@@ -28,7 +28,7 @@ def load_plan(allow_example: bool = False) -> tuple[Plan, str]:
         if name == EXAMPLE and not allow_example:
             raise SystemExit(_example_message())
         namespace: dict = {"__file__": str(path), "__name__": "plan"}
-        exec(compile(path.read_text(), str(path), "exec"), namespace)
+        exec(compile(path.read_text(encoding="utf-8"), str(path), "exec"), namespace)
         note = name if name == "plan.py" else f"{name} (example — run `cp {EXAMPLE} plan.py` to make it yours)"
         return namespace["PLAN"], note
     sys.exit(f"No plan found. Copy the example and edit it:\n    cp {EXAMPLE} plan.py\n"
@@ -69,8 +69,9 @@ def _example_message() -> str:
 if __name__ == "__main__":
     from season.config import load_settings
     from season.container import build_app
-    from season.interfaces.cli.remind import summary
+    from season.interfaces.cli.remind import summary, utf8_stdout
 
+    utf8_stdout()
     settings = load_settings()
     has_own_plan = plan_file_exists()
     message = "" if has_own_plan else _example_message()

@@ -1,0 +1,116 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install Python 3.14 and dependencies
+        run: uv sync --locked
+      - name: Unit tests
+        run: uv run python -m unittest discover -s tests -t . -v
+      - name: Seed the example plan and print a reminder
+        run: |
+          uv run seed.py
+          uv run python -m season.interfaces.cli.remind --quiet
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uvx ruff check season tests plan.example.py seed.py serve.py
+      - name: Shell scripts parse
+        run: for f in app/macos/*.sh; do bash -n "$f"; done
+
+  # The Windows install path end to end, in Windows PowerShell 5.1 (what every Windows has).
+  windows-install:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - run: uv run seed.py
+
+      - name: Scripts parse and are ASCII
+        run: |
+          foreach ($f in Get-ChildItem app\windows\*.ps1) {
+            $errs = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$errs)
+            if ($errs) { $errs; throw "parse errors in $($f.Name)" }
+            if ([IO.File]::ReadAllBytes($f.FullName) | Where-Object { $_ -gt 127 }) { throw "$($f.Name) is not ASCII" }
+          }
+
+      - name: Install starts the server and adds shortcuts
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File app\windows\install.ps1
+          if ($LASTEXITCODE) { throw "install failed" }
+          $startup = Join-Path ([Environment]::GetFolderPath('Startup')) 'Season server.lnk'
+          $menu    = Join-Path ([Environment]::GetFolderPath('Programs')) 'Season.lnk'
+          if (-not (Test-Path $startup)) { throw "no Startup shortcut" }
+          if (-not (Test-Path $menu))    { throw "no Start menu shortcut" }
+          $board = Invoke-RestMethod http://127.0.0.1:8765/api/board
+          "weeks: $($board.weeks.Count)"
+          if ($board.weeks.Count -lt 1) { throw "empty board" }
+
+      - name: Writes work over HTTP (add a sized task, rejects cross-site)
+        run: |
+          $h = @{ 'X-Requested-With' = 'season' }
+          $week = (Invoke-RestMethod http://127.0.0.1:8765/api/board).weeks[0].start
+          $body = @{ week = $week; text = 'Read related papers 3x2h' } | ConvertTo-Json
+          $b = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8765/api/tasks -Headers $h -Body $body -ContentType 'application/json'
+          $t = $b.weeks[0].tasks | Where-Object { $_.user_added } | Select-Object -First 1
+          "added: $($t.text) $($t.sessions) x $($t.each)h"
+          if ($t.sessions -ne 3 -or $t.each -ne 2) { throw "size not parsed" }
+          try {
+            Invoke-WebRequest -UseBasicParsing -Method Post -Uri http://127.0.0.1:8765/api/problems/skip -Headers @{ Origin = 'https://evil.example'; 'X-Requested-With' = 'season' } | Out-Null
+            throw "cross-site write was accepted"
+          } catch { if ($_.Exception.Response.StatusCode.value__ -ne 403) { throw } }
+
+      - name: Reminder prints non-ASCII text when redirected
+        run: |
+          uv run python -m season.interfaces.cli.remind --quiet > remind.txt
+          if ($LASTEXITCODE) { throw "remind failed" }
+          Get-Content remind.txt -Encoding UTF8
+
+      - name: Toast notifier script parses
+        run: |
+          $cmd = uv run python -c "from season.adapters.system import WindowsNotifier as W; print(W.command()[-1])"
+          $script = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($cmd.Trim()))
+          $errs = $null
+          [void][System.Management.Automation.Language.Parser]::ParseInput($script, [ref]$null, [ref]$errs)
+          if ($errs) { $errs; throw "toast script has parse errors" }
+          uv run python -c "from season.adapters.system import default_notifier as d; n = d(); print(type(n).__name__); n.notify('Season', 'CI test - en dash')"
+
+      - name: Remove stops the server; the launcher starts it again
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File app\windows\install.ps1 -Remove
+          Start-Sleep -Seconds 1
+          $up = $true; try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 http://127.0.0.1:8765/api/board | Out-Null } catch { $up = $false }
+          if ($up) { throw "server still running after -Remove" }
+          if (Test-Path (Join-Path ([Environment]::GetFolderPath('Programs')) 'Season.lnk')) { throw "shortcut left behind" }
+          powershell -NoProfile -ExecutionPolicy Bypass -File app\windows\open-season.ps1
+          $board = Invoke-RestMethod http://127.0.0.1:8765/api/board
+          "launcher brought the server back: $($board.weeks.Count) weeks"
+          Get-Process msedge, chrome -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+      - name: server.log
+        if: always()
+        run: if (Test-Path server.log) { Get-Content server.log }

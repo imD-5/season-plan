@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from season.adapters.jev_classifier import JevClassifier, UnavailableClassifier
 from season.adapters.sqlite_store import SqliteDatabase
-from season.adapters.system import MacNotifier, SystemClock
+from season.adapters.system import SystemClock, default_notifier
 from season.application import use_cases as uc
 from season.application.ports import Classifier, Clock, Notifier
 from season.config import Settings
@@ -43,7 +43,7 @@ def build_app(settings: Settings, *, classifier: Classifier | None = None,
     get_board = uc.GetBoard(uow, clock)
     return App(
         settings=settings,
-        notifier=notifier or MacNotifier(),
+        notifier=notifier or default_notifier(),
         get_board=get_board,
         get_week_status=uc.GetWeekStatus(get_board),
         mark_session=uc.MarkSession(uow, clock),

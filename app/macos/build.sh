@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 
 APP="$HOME/Applications/Season.app"
 # Identifiers. Override with env vars if you want your own reverse-DNS names;
-# the label must match the one app/install-server.sh used.
+# the label must match the one app/macos/install-server.sh used.
 BUNDLE_ID="${SEASON_BUNDLE_ID:-local.season.app}"
 SERVER_LABEL="${SEASON_SERVER_LABEL:-local.season.server}"
 BUILD="$(mktemp -d)"

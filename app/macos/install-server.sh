@@ -1,14 +1,14 @@
 #!/bin/bash
 # Run the board server in the background at login (macOS launchd).
 #
-#   app/install-server.sh            install or update, then start
-#   app/install-server.sh --remove   stop and uninstall
+#   app/macos/install-server.sh            install or update, then start
+#   app/macos/install-server.sh --remove   stop and uninstall
 #
-# The label must match the one app/build.sh puts in Season.app, so the app can
+# The label must match the one app/macos/build.sh puts in Season.app, so the app can
 # restart the server if it isn't answering. Override both with SEASON_SERVER_LABEL.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LABEL="${SEASON_SERVER_LABEL:-local.season.server}"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 DOMAIN="gui/$(id -u)"

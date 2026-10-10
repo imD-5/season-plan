@@ -29,6 +29,13 @@ def message(status: WeekStatus) -> str:
     return body
 
 
+def utf8_stdout() -> None:
+    """Dates and names contain en dashes etc.; legacy Windows code pages can't print them."""
+    for stream in (sys.stdout, sys.stderr):
+        if stream is not None and hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
+
 def summary(status: WeekStatus) -> str:
     lines = [f"Week of {status.week.start} ({status.week.label}). Pages: {status.pages}."]
     for t in status.week.tasks:
@@ -39,6 +46,7 @@ def summary(status: WeekStatus) -> str:
 
 
 def main(argv: list[str]) -> int:
+    utf8_stdout()
     app = build_app(load_settings())
     status = app.get_week_status()
     body = message(status)
