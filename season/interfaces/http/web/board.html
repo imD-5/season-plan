@@ -27,6 +27,9 @@
            padding-left: max(22px, env(safe-area-inset-left)); padding-right: max(22px, env(safe-area-inset-right));
            padding-bottom: max(28px, env(safe-area-inset-bottom)); }
   html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
+  /* Home Screen app: the status bar is see-through, so cover what scrolls under it */
+  body::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top);
+                 background: #121210; z-index: 100; pointer-events: none; }
   #board * { box-sizing: border-box; }
   button, input { font: inherit; color: inherit; }
   button { cursor: pointer; }
@@ -39,7 +42,7 @@
           font-variant-numeric: tabular-nums; }
   .pages { background: none; border: 0; padding: 6px 8px; margin: -6px -8px; color: #9c978c;
            transition: background 120ms, color 120ms; }
-  .pages:hover { background: rgba(243,240,232,0.07); color: #f3f0e8; }
+
   .pages-input { width: 3.2em; background: transparent; border: 0; border-bottom: 1px solid #4a4741;
                  color: #f3f0e8; font-size: 13px; padding: 0 0 2px; text-align: right; }
 
@@ -49,11 +52,11 @@
   .tick { position: relative; width: 18px; height: 18px; padding: 0; border: 1px solid #4a4741;
           background: transparent; border-radius: 0; transition: background 120ms, border-color 120ms; }
   .tick::before { content: ""; position: absolute; inset: -5px; }
-  .tick:hover { border-color: #f3f0e8; background: #34312c; }
+
   .tick.past { background: #4a4741; border-color: #4a4741; }
-  .tick.past:hover { background: #6a665e; border-color: #f3f0e8; }
+
   .tick.now { background: #f3f0e8; border-color: #f3f0e8; }
-  .tick.now:hover { background: #fff; }
+
   .tick.on { outline: 1px solid #f3f0e8; outline-offset: 2px; }
 
   .glance { padding-top: 14px; font-size: 13px; color: #9c978c; }
@@ -77,32 +80,32 @@
   li { position: relative; display: grid; grid-template-columns: 76px minmax(0, 1fr) auto 64px; gap: 10px;
        align-items: center; min-height: 40px; margin: 0 -10px; padding: 0 10px; cursor: pointer;
        transition: background 120ms; }
-  li:hover { background: rgba(243,240,232,0.07); }
+
   .tag { justify-self: start; max-width: 100%; background: none; border: 0; padding: 3px 6px; margin-left: -6px;
          font-size: 11px; color: #8a867e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
          transition: background 120ms, color 120ms; }
-  .tag:hover, .tag.open { background: rgba(243,240,232,0.1); color: #f3f0e8; }
+  .tag.open { background: rgba(243,240,232,0.1); color: #f3f0e8; }
   .tag.unsorted { color: #e8b64c; }
   .name { font-size: 15px; line-height: 1.25; }
   li.done .name { color: #6a665e; text-decoration: line-through; }
   .lc { background: none; border: 0; padding: 0; color: inherit; font: inherit; }
-  .lc:hover { text-decoration: underline; text-underline-offset: 3px; }
+
   .rm { background: none; border: 0; padding: 0 0 0 8px; color: #4a4741; font-size: 13px; visibility: hidden; }
-  li:hover .rm { visibility: visible; }
-  .rm:hover { color: #f3f0e8; }
+
+
   .boxes { display: flex; gap: 5px; }
   .box { position: relative; width: 15px; height: 15px; padding: 0; border: 1px solid #f3f0e8;
          background: transparent; border-radius: 0; transition: background 120ms; }
   .box::before { content: ""; position: absolute; inset: -4px; }
   .box[aria-pressed="true"] { background: #f3f0e8; }
-  li:hover .box[aria-pressed="false"] { background: rgba(243,240,232,0.12); }
-  .box[aria-pressed="false"]:hover { background: rgba(243,240,232,0.35) !important; }
+
+
   .time { justify-self: end; min-width: 56px; background: none; border: 0; padding: 4px 6px; margin-right: -6px;
           font-size: 12px; color: #6a665e; text-align: right; font-variant-numeric: tabular-nums;
           transition: background 120ms, color 120ms; }
-  li:hover .time { color: #9c978c; }
+
   li.done .time { color: #4a4741; }
-  .time:hover, .time.open { background: rgba(243,240,232,0.1); color: #f3f0e8 !important; }
+  .time.open { background: rgba(243,240,232,0.1); color: #f3f0e8 !important; }
   .time.unset { color: #4a4741; }
 
   /* size popover: boxes and hours per box */
@@ -114,7 +117,7 @@
   .sizer .val { text-align: center; font-size: 15px; color: #f3f0e8; font-variant-numeric: tabular-nums; }
   .sizer .step { height: 34px; background: none; border: 1px solid #3a3731; font-size: 16px; color: #d8d4ca;
                  transition: background 120ms, border-color 120ms; }
-  .sizer .step:hover:not(:disabled) { background: rgba(243,240,232,0.1); border-color: #6a665e; color: #f3f0e8; }
+
   .sizer .step:disabled { color: #3a3731; cursor: not-allowed; }
   .sizer .total { font-size: 11px; color: #6a665e; }
   .add-hint { padding-top: 6px; font-size: 11px; color: #6a665e; }
@@ -128,7 +131,7 @@
             cursor: default; }
   .picker button { display: flex; justify-content: space-between; gap: 8px; width: 100%; padding: 7px 12px;
                    background: none; border: 0; text-align: left; font-size: 13px; color: #d8d4ca; }
-  .picker button:hover { background: rgba(243,240,232,0.08); color: #f3f0e8; }
+
   .picker button.current { color: #f3f0e8; font-weight: 600; }
   .picker .hint { color: #6a665e; font-size: 11px; font-weight: 400; overflow: hidden; text-overflow: ellipsis;
                   white-space: nowrap; max-width: 150px; }
@@ -143,25 +146,25 @@
   .add { display: block; width: calc(100% + 20px); margin: 4px -10px 0; min-height: 40px; background: none;
          border: 0; padding: 0 10px; color: #6a665e; font-size: 13px; text-align: left;
          transition: background 120ms, color 120ms; }
-  .add:hover { background: rgba(243,240,232,0.07); color: #f3f0e8; }
+
   .add-input { display: block; width: 100%; margin-top: 10px; background: transparent; border: 0;
                border-bottom: 1px solid #4a4741; color: #f3f0e8; font-size: 15px; padding: 6px 0; }
   .status { min-height: 16px; padding-top: 10px; font-size: 12px; color: #9c978c; }
   .status.error { color: #d99a9a; }
   .undo { background: none; border: 0; padding: 2px 6px; margin-left: 6px; color: #f3f0e8;
           text-decoration: underline; text-underline-offset: 3px; font-size: 12px; }
-  .undo:hover { background: rgba(243,240,232,0.1); }
+
 
   /* session notes */
   .notes { grid-column: 2 / -1; display: grid; gap: 2px; padding: 0 0 8px; cursor: default; }
   .note { display: flex; align-items: baseline; gap: 8px; min-height: 22px; margin: 0 -6px; padding: 1px 6px;
           font-size: 12px; color: #9c978c; cursor: text; transition: background 120ms, color 120ms; }
-  .note:hover { background: rgba(243,240,232,0.06); color: #d8d4ca; }
+
   .note .when { flex: none; color: #6a665e; font-variant-numeric: tabular-nums; }
   .note .txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .note .x { margin-left: auto; background: none; border: 0; padding: 0 4px; color: #4a4741; visibility: hidden; }
-  .note:hover .x { visibility: visible; }
-  .note .x:hover { color: #f3f0e8; }
+
+
   .note-input { width: 100%; background: transparent; border: 0; border-bottom: 1px solid #4a4741;
                 color: #f3f0e8; font-size: 13px; padding: 4px 0; }
   .note-input::placeholder { color: #6a665e; }
@@ -171,7 +174,6 @@
     .rm, .note .x { visibility: visible; }
     .rm { color: #6a665e; padding: 6px 4px 6px 12px; }
     .note .x { color: #6a665e; padding: 4px 8px; }
-    li:hover { background: none; }
     li:active { background: rgba(243,240,232,0.07); }
   }
 
@@ -207,6 +209,32 @@
 
     /* iOS zooms into any text field under 16px on focus */
     .add-input, .note-input, .pages-input, .picker input { font-size: 16px; }
+  }
+
+  /* hover effects only where a mouse can hover: on iPhone a :hover style makes the first tap
+     "hover" and only the second tap click */
+  @media (hover: hover) {
+    .pages:hover { background: rgba(243,240,232,0.07); color: #f3f0e8; }
+    .tick:hover { border-color: #f3f0e8; background: #34312c; }
+    .tick.past:hover { background: #6a665e; border-color: #f3f0e8; }
+    .tick.now:hover { background: #fff; }
+    li:hover { background: rgba(243,240,232,0.07); }
+    .tag:hover { background: rgba(243,240,232,0.1); color: #f3f0e8; }
+    .lc:hover { text-decoration: underline; text-underline-offset: 3px; }
+    li:hover .rm { visibility: visible; }
+    .rm:hover { color: #f3f0e8; }
+    li:hover .box[aria-pressed="false"] { background: rgba(243,240,232,0.12); }
+    .box[aria-pressed="false"]:hover { background: rgba(243,240,232,0.35) !important; }
+    li:hover .time { color: #9c978c; }
+    li.done:hover .time { color: #4a4741; }
+    .time:hover { background: rgba(243,240,232,0.1); color: #f3f0e8 !important; }
+    .sizer .step:hover:not(:disabled) { background: rgba(243,240,232,0.1); border-color: #6a665e; color: #f3f0e8; }
+    .picker button:hover { background: rgba(243,240,232,0.08); color: #f3f0e8; }
+    .add:hover { background: rgba(243,240,232,0.07); color: #f3f0e8; }
+    .undo:hover { background: rgba(243,240,232,0.1); }
+    .note:hover { background: rgba(243,240,232,0.06); color: #d8d4ca; }
+    .note:hover .x { visibility: visible; }
+    .note .x:hover { color: #f3f0e8; }
   }
 </style>
 </head>
