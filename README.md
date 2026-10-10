@@ -30,6 +30,7 @@ cp .env.example .env        # optional: add TYPESAFE_API_KEY for task sorting
 cp plan.example.py plan.py  # then make it your own: tasks, events, dates
 uv run seed.py              # load plan.py into season.db
 uv run serve.py             # http://127.0.0.1:8765/
+app/install-server.sh       # optional: keep the server running in the background (launchd)
 app/build.sh                # optional: build ~/Applications/Season.app
 ```
 

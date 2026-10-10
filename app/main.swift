@@ -5,6 +5,8 @@ import Cocoa
 import WebKit
 
 let boardURL = URL(string: "http://127.0.0.1:8765/")!
+// launchd label of the board server; build.sh writes it into Info.plist
+let serverLabel = Bundle.main.object(forInfoDictionaryKey: "SeasonServerLabel") as? String ?? "local.season.server"
 let bg = NSColor(srgbRed: 0x12 / 255.0, green: 0x12 / 255.0, blue: 0x10 / 255.0, alpha: 1)
 
 final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
@@ -70,7 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         web.loadHTMLString(html, baseURL: nil)
         let kick = Process()
         kick.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        kick.arguments = ["kickstart", "gui/\(getuid())/com.daigokimura.season-board"]
+        kick.arguments = ["kickstart", "gui/\(getuid())/\(serverLabel)"]
         try? kick.run()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.load() }
     }

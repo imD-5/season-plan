@@ -4,6 +4,10 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 APP="$HOME/Applications/Season.app"
+# Identifiers. Override with env vars if you want your own reverse-DNS names;
+# the label must match the one app/install-server.sh used.
+BUNDLE_ID="${SEASON_BUNDLE_ID:-local.season.app}"
+SERVER_LABEL="${SEASON_SERVER_LABEL:-local.season.server}"
 BUILD="$(mktemp -d)"
 trap 'rm -rf "$BUILD"' EXIT
 
@@ -25,14 +29,15 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BUILD/Season" "$APP/Contents/MacOS/Season"
 cp "$BUILD/Season.icns" "$APP/Contents/Resources/Season.icns"
-cat > "$APP/Contents/Info.plist" <<'PLIST'
+cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>CFBundleName</key><string>Season</string>
   <key>CFBundleDisplayName</key><string>Season</string>
-  <key>CFBundleIdentifier</key><string>com.daigokimura.season</string>
+  <key>CFBundleIdentifier</key><string>${BUNDLE_ID}</string>
+  <key>SeasonServerLabel</key><string>${SERVER_LABEL}</string>
   <key>CFBundleExecutable</key><string>Season</string>
   <key>CFBundleIconFile</key><string>Season</string>
   <key>CFBundlePackageType</key><string>APPL</string>
