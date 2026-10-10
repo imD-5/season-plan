@@ -1,0 +1,22 @@
+[project]
+name = "season"
+version = "0.2.0"
+description = "Season board: weekly menu of work sessions, local server + Mac app"
+requires-python = ">=3.14"
+dependencies = [
+    "typesafe-sdk>=0.7",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 120
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.ruff.lint.isort]
+force-wrap-aliases = false
+split-on-trailing-comma = false

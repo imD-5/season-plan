@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Season board</title>
+<!-- Presentation only. Data and rules live behind /api (see season/interfaces/http/server.py). -->
+<style>
+  html, body { color-scheme: dark; background: #121210; color: #f3f0e8; margin: 0; overflow-x: hidden;
+               font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+               -webkit-user-select: none; user-select: none; }
+  input { -webkit-user-select: text; user-select: text; }
+  #board { box-sizing: border-box; width: 100%; max-width: 760px; margin: 0 auto; padding: 14px 22px 28px; }
+  #board * { box-sizing: border-box; }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:focus-visible, input:focus-visible { outline: 1px solid #f3f0e8; outline-offset: 3px; }
+  h1, p, ul { margin: 0; }
+
+  .head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+  h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.03em; line-height: 1; }
+  .meta { display: flex; align-items: baseline; gap: 14px; font-size: 13px; color: #9c978c;
+          font-variant-numeric: tabular-nums; }
+  .pages { background: none; border: 0; padding: 6px 8px; margin: -6px -8px; color: #9c978c;
+           transition: background 120ms, color 120ms; }
+  .pages:hover { background: rgba(243,240,232,0.07); color: #f3f0e8; }
+  .pages-input { width: 3.2em; background: transparent; border: 0; border-bottom: 1px solid #4a4741;
+                 color: #f3f0e8; font-size: 13px; padding: 0 0 2px; text-align: right; }
+
+  .season { display: flex; flex-wrap: wrap; gap: 12px 18px; padding-top: 16px; }
+  .month { font-size: 10px; letter-spacing: 0.08em; color: #6a665e; padding-bottom: 6px; }
+  .dots { display: flex; gap: 8px; align-items: center; height: 22px; }
+  .tick { position: relative; width: 18px; height: 18px; padding: 0; border: 1px solid #4a4741;
+          background: transparent; border-radius: 0; transition: background 120ms, border-color 120ms; }
+  .tick::before { content: ""; position: absolute; inset: -5px; }
+  .tick:hover { border-color: #f3f0e8; background: #34312c; }
+  .tick.past { background: #4a4741; border-color: #4a4741; }
+  .tick.past:hover { background: #6a665e; border-color: #f3f0e8; }
+  .tick.now { background: #f3f0e8; border-color: #f3f0e8; }
+  .tick.now:hover { background: #fff; }
+  .tick.on { outline: 1px solid #f3f0e8; outline-offset: 2px; }
+
+  .glance { padding-top: 14px; font-size: 13px; color: #9c978c; }
+
+  .days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; padding-top: 12px; }
+  .day { min-height: 78px; padding: 6px 5px; border-top: 1px solid #34312c; }
+  .day.past { opacity: 0.7; }
+  .day.today { border-top: 2px solid #f3f0e8; background: rgba(243,240,232,0.06); opacity: 1; }
+  .dn { font-size: 11px; color: #8a867e; padding-bottom: 5px; font-variant-numeric: tabular-nums; }
+  .day.today .dn { color: #f3f0e8; font-weight: 600; }
+  .ev, .did { font-size: 11px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ev { color: #d8d4ca; }
+  .ev.me, .ev.due { color: #e8b64c; font-weight: 600; }
+  .ev.her { color: #d99a9a; }
+  .ev.off { color: #6a665e; }
+  .did { color: #8fb38a; }
+  .did::before { content: "\2713 "; }
+
+  .menu-label { padding-top: 20px; font-size: 10px; letter-spacing: 0.08em; color: #6a665e; }
+  ul { list-style: none; padding: 6px 0 0; }
+  li { position: relative; display: grid; grid-template-columns: 76px minmax(0, 1fr) auto 64px; gap: 10px;
+       align-items: center; min-height: 40px; margin: 0 -10px; padding: 0 10px; cursor: pointer;
+       transition: background 120ms; }
+  li:hover { background: rgba(243,240,232,0.07); }
+  .tag { justify-self: start; max-width: 100%; background: none; border: 0; padding: 3px 6px; margin-left: -6px;
+         font-size: 11px; color: #8a867e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+         transition: background 120ms, color 120ms; }
+  .tag:hover, .tag.open { background: rgba(243,240,232,0.1); color: #f3f0e8; }
+  .tag.unsorted { color: #e8b64c; }
+  .name { font-size: 15px; line-height: 1.25; }
+  li.done .name { color: #6a665e; text-decoration: line-through; }
+  .lc { background: none; border: 0; padding: 0; color: inherit; font: inherit; }
+  .lc:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .rm { background: none; border: 0; padding: 0 0 0 8px; color: #4a4741; font-size: 13px; visibility: hidden; }
+  li:hover .rm { visibility: visible; }
+  .rm:hover { color: #f3f0e8; }
+  .boxes { display: flex; gap: 5px; }
+  .box { position: relative; width: 15px; height: 15px; padding: 0; border: 1px solid #f3f0e8;
+         background: transparent; border-radius: 0; transition: background 120ms; }
+  .box::before { content: ""; position: absolute; inset: -4px; }
+  .box[aria-pressed="true"] { background: #f3f0e8; }
+  li:hover .box[aria-pressed="false"] { background: rgba(243,240,232,0.12); }
+  .box[aria-pressed="false"]:hover { background: rgba(243,240,232,0.35) !important; }
+  .time { font-size: 12px; color: #6a665e; text-align: right; font-variant-numeric: tabular-nums; }
+  li:hover .time { color: #9c978c; }
+  li.done .time { color: #4a4741; }
+
+  /* type picker */
+  .picker { position: absolute; top: 36px; left: 4px; z-index: 20; width: 260px; padding: 4px 0;
+            background: #1d1c19; border: 1px solid #3a3731; box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+            cursor: default; }
+  .picker button { display: flex; justify-content: space-between; gap: 8px; width: 100%; padding: 7px 12px;
+                   background: none; border: 0; text-align: left; font-size: 13px; color: #d8d4ca; }
+  .picker button:hover { background: rgba(243,240,232,0.08); color: #f3f0e8; }
+  .picker button.current { color: #f3f0e8; font-weight: 600; }
+  .picker .hint { color: #6a665e; font-size: 11px; font-weight: 400; overflow: hidden; text-overflow: ellipsis;
+                  white-space: nowrap; max-width: 150px; }
+  .picker hr { border: 0; border-top: 1px solid #34312c; margin: 4px 0; }
+  .picker form { display: grid; gap: 8px; padding: 8px 12px 10px; }
+  .picker label { font-size: 11px; color: #8a867e; display: grid; gap: 3px; }
+  .picker input { background: #121210; border: 1px solid #3a3731; color: #f3f0e8; font-size: 13px; padding: 6px 8px; }
+  .picker .actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .picker .actions button { width: auto; padding: 5px 10px; font-size: 12px; border: 1px solid #3a3731; }
+  .picker .actions button[type="submit"] { background: #f3f0e8; color: #121210; border-color: #f3f0e8; }
+
+  .add { display: block; width: calc(100% + 20px); margin: 4px -10px 0; min-height: 40px; background: none;
+         border: 0; padding: 0 10px; color: #6a665e; font-size: 13px; text-align: left;
+         transition: background 120ms, color 120ms; }
+  .add:hover { background: rgba(243,240,232,0.07); color: #f3f0e8; }
+  .add-input { display: block; width: 100%; margin-top: 10px; background: transparent; border: 0;
+               border-bottom: 1px solid #4a4741; color: #f3f0e8; font-size: 15px; padding: 6px 0; }
+  .status { min-height: 16px; padding-top: 10px; font-size: 12px; color: #9c978c; }
+  .status.error { color: #d99a9a; }
+  .undo { background: none; border: 0; padding: 2px 6px; margin-left: 6px; color: #f3f0e8;
+          text-decoration: underline; text-underline-offset: 3px; font-size: 12px; }
+  .undo:hover { background: rgba(243,240,232,0.1); }
+
+  /* session notes */
+  .notes { grid-column: 2 / -1; display: grid; gap: 2px; padding: 0 0 8px; cursor: default; }
+  .note { display: flex; align-items: baseline; gap: 8px; min-height: 22px; margin: 0 -6px; padding: 1px 6px;
+          font-size: 12px; color: #9c978c; cursor: text; transition: background 120ms, color 120ms; }
+  .note:hover { background: rgba(243,240,232,0.06); color: #d8d4ca; }
+  .note .when { flex: none; color: #6a665e; font-variant-numeric: tabular-nums; }
+  .note .txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .note .x { margin-left: auto; background: none; border: 0; padding: 0 4px; color: #4a4741; visibility: hidden; }
+  .note:hover .x { visibility: visible; }
+  .note .x:hover { color: #f3f0e8; }
+  .note-input { width: 100%; background: transparent; border: 0; border-bottom: 1px solid #4a4741;
+                color: #f3f0e8; font-size: 13px; padding: 4px 0; }
+  .note-input::placeholder { color: #6a665e; }
+</style>
+</head>
+<body>
+<div id="board"></div>
+<script>
+(function () {
+  "use strict";
+  var root = document.getElementById("board");
+  var DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  var MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  var S = null;              // board from /api/board
+  var weekIndex = null;      // which week is shown (view state only)
+  var adding = false;
+  var editingPages = false;
+  var pickerFor = null;      // task id whose type picker is open
+  var newTypeFor = null;     // task id the "new type" form is for
+  var status = { text: "", error: false };
+  var noteEdit = null;       // {task, slot, draft} whose note field is open
+  var redrawing = false;     // true while render() tears down the DOM; blur then is not the user leaving
+  var undo = null;           // {label, run} for the last reversible step
+
+  // ── api ────────────────────────────────────────────────────────────────
+  function api(method, path, body) {
+    var opts = { method: method, cache: "no-store", headers: { "X-Requested-With": "season" } };
+    if (body !== undefined) { opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
+    return fetch(path, opts).then(function (r) {
+      return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ("HTTP " + r.status)); return j; });
+    });
+  }
+  function load() {
+    if (pickerFor !== null || adding || noteEdit) return Promise.resolve();
+    return api("GET", "/api/board")
+      .then(function (b) {
+        S = b; if (weekIndex === null) weekIndex = pickWeek();
+        if (pickerFor === null && !adding && !noteEdit && !editingPages) render();
+      })
+      .catch(function () { setStatus("Can't reach the board server.", true); });
+  }
+  function write(method, path, body, pending, keepUndo) {
+    if (!keepUndo) undo = null;
+    if (pending) setStatus(pending, false);
+    return api(method, path, body)
+      .then(function (b) { S = b; setStatus(b.notice || "", false); return b; })
+      .catch(function (e) { undo = null; setStatus("Not saved: " + e.message, true); return null; });
+  }
+  function setStatus(text, isError) { status = { text: text, error: !!isError }; render(); }
+  function slotPath(id, slot) { return "/api/tasks/" + id + "/slots/" + slot; }
+
+  // tick → open the note field for that session
+  function check(t, slot) {
+    noteEdit = null;
+    write("POST", slotPath(t.id, slot)).then(function (b) { if (b) { noteEdit = { task: t.id, slot: slot }; render(); } });
+  }
+  // untick → offer Undo, which brings back the date, problem and note
+  function uncheck(t, slot) {
+    noteEdit = null;
+    write("DELETE", slotPath(t.id, slot)).then(function (b) {
+      if (!b || !b.undo) return;
+      var u = b.undo;
+      undo = { label: "Unchecked" + (u.note ? " (note kept for undo)" : "") + ".", run: function () {
+        write("POST", slotPath(u.task_id, u.slot) + "/restore", { d: u.d, problem: u.problem, note: u.note });
+      } };
+      render();
+    });
+  }
+  function saveNote(t, slot, text) {
+    var before = (t.slots[slot] || {}).note || null, after = text.trim() || null;
+    if (before === after) { render(); return; }
+    write("PUT", slotPath(t.id, slot) + "/note", { note: after }).then(function (b) {
+      if (!b) return;
+      undo = { label: after ? (before ? "Note changed." : "Note saved.") : "Note removed.", run: function () {
+        write("PUT", slotPath(t.id, slot) + "/note", { note: before });
+      } };
+      render();
+    });
+  }
+
+  // ── dates ──────────────────────────────────────────────────────────────
+  function iso(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+  function todayISO() { return iso(new Date()); }
+  function addDays(s, n) { var p = s.split("-"); var d = new Date(+p[0], +p[1] - 1, +p[2]); d.setDate(d.getDate() + n); return iso(d); }
+  function dow(s) { var p = s.split("-"); return DOW[(new Date(+p[0], +p[1] - 1, +p[2]).getDay() + 6) % 7]; }
+  function pickWeek() {
+    var t = todayISO(), w = S.weeks;
+    for (var i = 0; i < w.length; i++) if (t >= w[i].start && t <= w[i].end) return i;
+    return t < w[0].start ? 0 : w.length - 1;
+  }
+
+  // ── helpers ────────────────────────────────────────────────────────────
+  function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+  function button(cls, text, onClick) {
+    var b = el("button", cls, text); b.type = "button";
+    b.addEventListener("click", function (e) { e.stopPropagation(); onClick(e); });
+    return b;
+  }
+  function categoryLabel(key) {
+    var c = S.categories.find(function (c) { return c.key === key; });
+    return c ? c.label : key;
+  }
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+  function timeText(t) { if (!t.each) return ""; return t.sessions === 1 ? t.each + "h" : t.sessions + " \u00d7 " + t.each + "h"; }
+  function doneLabel(t, e) {
+    if (t.problem_list) return "LC " + (e.problem || "");
+    return t.user_added ? t.text : cap(categoryLabel(t.category));
+  }
+  var notesOn = {};          // label -> notes for the day being drawn
+  function didOn(date) {
+    var counts = {}, order = [];
+    notesOn = {};
+    S.weeks.forEach(function (w) {
+      w.tasks.forEach(function (t) {
+        t.slots.forEach(function (e) {
+          if (!e || e.d !== date) return;
+          var k = doneLabel(t, e);
+          if (e.note) notesOn[k] = (notesOn[k] ? notesOn[k] + "\n" : "") + e.note;
+          if (!(k in counts)) { counts[k] = 0; order.push(k); }
+          counts[k] += 1;
+        });
+      });
+    });
+    return order.map(function (k) { return counts[k] > 1 ? k + " \u00d7" + counts[k] : k; });
+  }
+  function tagTitle(t) {
+    var pct = t.confidence == null ? "" : " (" + Math.round(t.confidence * 100) + "%)";
+    return {
+      plan: "From the plan. Click to change.",
+      jev: "Sorted by Jev" + pct + ". Click to change.",
+      fallback: "Jev wasn't sure" + pct + ". Click to pick a type or make a new one.",
+      manual: "You picked this. Click to change."
+    }[t.assigned_by] || "Click to change";
+  }
+  function closePicker() { pickerFor = null; newTypeFor = null; }
+
+  // ── render ─────────────────────────────────────────────────────────────
+  function render() {
+    redrawing = true;
+    root.textContent = "";
+    redrawing = false;
+    if (!S) { root.appendChild(el("p", "status" + (status.error ? " error" : ""), status.text || "Loading\u2026")); return; }
+
+    var week = S.weeks[weekIndex], today = todayISO(), nowIndex = pickWeek();
+
+    // head
+    var head = el("div", "head");
+    head.appendChild(el("h1", null, week.label));
+    var meta = el("div", "meta");
+    meta.appendChild(el("span", null, "~" + week.hours + "h this week"));
+    if (editingPages) {
+      var inp = el("input", "pages-input");
+      inp.setAttribute("aria-label", "Pages written");
+      inp.value = S.pages == null ? "" : String(S.pages);
+      inp.addEventListener("keydown", function (e) { if (e.key === "Enter") inp.blur(); if (e.key === "Escape") { editingPages = false; render(); } });
+      inp.addEventListener("blur", function () {
+        if (redrawing || !editingPages) return;
+        editingPages = false;
+        var v = inp.value.trim(), n = Number(v);
+        if (v === "") write("PUT", "/api/pages", { pages: null });
+        else if (Number.isInteger(n) && n >= 0 && n <= S.pages_target) write("PUT", "/api/pages", { pages: n });
+        else render();
+      });
+      meta.appendChild(inp);
+      setTimeout(function () { inp.focus(); inp.select(); }, 0);
+    } else {
+      meta.appendChild(button("pages", (S.pages == null ? "\u2014" : S.pages) + " / " + S.pages_target + " pp",
+        function () { editingPages = true; render(); }));
+    }
+    head.appendChild(meta);
+    root.appendChild(head);
+
+    // season
+    var season = el("div", "season"), group = null, month = "";
+    S.weeks.forEach(function (w, i) {
+      var key = w.start.slice(0, 7);
+      if (key !== month) {
+        month = key; group = el("div");
+        group.appendChild(el("div", "month", MONTHS[+key.slice(5) - 1]));
+        group.appendChild(el("div", "dots"));
+        season.appendChild(group);
+      }
+      var t = button("tick", null, function () { weekIndex = i; adding = false; closePicker(); render(); });
+      t.title = w.label; t.setAttribute("aria-label", w.label);
+      if (w.end < today) t.classList.add("past");
+      if (i === nowIndex) t.classList.add("now");
+      if (i === weekIndex && i !== nowIndex) t.classList.add("on");
+      group.lastChild.appendChild(t);
+    });
+    root.appendChild(season);
+
+    if (week.glance) root.appendChild(el("p", "glance", week.glance));
+
+    // day strip
+    var days = el("div", "days");
+    for (var i = 0; i < 7; i++) {
+      var date = addDays(week.start, i), cell = el("div", "day");
+      if (date === today) cell.classList.add("today"); else if (date < today) cell.classList.add("past");
+      cell.appendChild(el("div", "dn", DOW[i] + " " + Number(date.slice(8))));
+      (S.events[date] || []).forEach(function (e) { var n = el("div", "ev " + (e.k || ""), e.t); n.title = e.t; cell.appendChild(n); });
+      didOn(date).forEach(function (t) {
+        var base = t.replace(/ \u00d7\d+$/, ""), n = el("div", "did", t);
+        n.title = notesOn[base] ? t + "\n" + notesOn[base] : t;
+        cell.appendChild(n);
+      });
+      days.appendChild(cell);
+    }
+    root.appendChild(days);
+
+    // menu of the week
+    root.appendChild(el("p", "menu-label", "THIS WEEK \u2014 PICK ANY"));
+    var list = el("ul");
+    week.tasks.forEach(function (t) { list.appendChild(row(t)); });
+    root.appendChild(list);
+
+    if (adding) {
+      var ai = el("input", "add-input");
+      ai.placeholder = "New task for this week"; ai.setAttribute("aria-label", "New task"); ai.maxLength = 160;
+      ai.addEventListener("keydown", function (e) { if (e.key === "Enter") ai.blur(); if (e.key === "Escape") { ai.value = ""; ai.blur(); } });
+      ai.addEventListener("blur", function () {
+        if (redrawing || !adding) return;
+        adding = false;
+        var v = ai.value.trim();
+        if (v) write("POST", "/api/tasks", { week: week.start, text: v }, "Sorting \u201c" + v + "\u201d\u2026");
+        else render();
+      });
+      root.appendChild(ai);
+      setTimeout(function () { ai.focus(); }, 0);
+    } else {
+      root.appendChild(button("add", "+ Add to this week", function () { closePicker(); adding = true; render(); }));
+    }
+
+    if (undo || status.text) {
+      var st = el("p", "status" + (status.error ? " error" : ""), undo ? undo.label : status.text);
+      if (undo) {
+        var run = undo.run;
+        st.appendChild(button("undo", "Undo", function () { undo = null; noteEdit = null; run(); }));
+      }
+      root.appendChild(st);
+    }
+  }
+
+  function row(t) {
+    var filled = t.slots.filter(Boolean).length;
+    var li = el("li", filled === t.slots.length ? "done" : "");
+
+    // type (click to change)
+    var tag = button("tag", categoryLabel(t.category), function () {
+      newTypeFor = null;
+      pickerFor = pickerFor === t.id ? null : t.id;
+      render();
+    });
+    if (t.category === "other") tag.classList.add("unsorted");
+    if (pickerFor === t.id) tag.classList.add("open");
+    tag.title = tagTitle(t);
+    li.appendChild(tag);
+
+    var name = el("span", "name");
+    if (t.problem_list && S.problem) {
+      var num = button("lc", String(S.problem.number), function () { write("POST", "/api/problems/skip"); });
+      num.title = "Skip to the next problem";
+      name.appendChild(num);
+      name.appendChild(document.createTextNode(" \u00b7 " + S.problem.title));
+    } else {
+      name.textContent = t.text;
+    }
+    if (t.user_added) {
+      var rm = button("rm", "\u00d7", function () { write("DELETE", "/api/tasks/" + t.id); });
+      rm.title = "Remove";
+      name.appendChild(rm);
+    }
+    li.appendChild(name);
+
+    var boxes = el("span", "boxes");
+    t.slots.forEach(function (e, i) {
+      var b = button("box", null, function () { if (e) uncheck(t, i); else check(t, i); });
+      b.setAttribute("aria-pressed", e ? "true" : "false");
+      b.title = e ? "Done " + dow(e.d) + " " + Number(e.d.slice(8)) + (e.problem ? " \u00b7 " + e.problem : "")
+                    + (e.note ? "\n" + e.note : "") + "\nClick to uncheck" : "Mark one session done";
+      boxes.appendChild(b);
+    });
+    li.appendChild(boxes);
+    li.appendChild(el("span", "time", timeText(t)));
+
+    li.addEventListener("click", function () {
+      if (pickerFor !== null) { closePicker(); render(); return; }
+      var next = t.slots.indexOf(null);
+      if (next >= 0) check(t, next); else uncheck(t, t.slots.length - 1);
+    });
+
+    var notes = notesBlock(t);
+    if (notes) li.appendChild(notes);
+    if (pickerFor === t.id) li.appendChild(picker(t));
+    return li;
+  }
+
+  // notes under a task: one line per checked session that has a note, plus the open field
+  function notesBlock(t) {
+    var wrap = el("div", "notes"), any = false;
+    wrap.addEventListener("click", function (e) { e.stopPropagation(); });
+    t.slots.forEach(function (e, i) {
+      if (!e) return;
+      var editing = noteEdit && noteEdit.task === t.id && noteEdit.slot === i;
+      if (editing) { wrap.appendChild(noteField(t, i, e)); any = true; return; }
+      if (!e.note) return;
+      var line = el("div", "note");
+      line.title = "Click to edit";
+      line.appendChild(el("span", "when", dow(e.d) + " " + Number(e.d.slice(8)) + (e.problem ? " \u00b7 " + e.problem : "")));
+      line.appendChild(el("span", "txt", e.note));
+      var x = button("x", "\u00d7", function () { noteEdit = null; saveNote(t, i, ""); });
+      x.title = "Remove note";
+      line.appendChild(x);
+      line.addEventListener("click", function () { closePicker(); noteEdit = { task: t.id, slot: i }; render(); });
+      wrap.appendChild(line);
+      any = true;
+    });
+    return any ? wrap : null;
+  }
+
+  function noteField(t, slot, e) {
+    var inp = el("input", "note-input");
+    inp.maxLength = 500;
+    inp.value = noteEdit.draft != null ? noteEdit.draft : (e.note || "");
+    inp.addEventListener("input", function () { if (noteEdit) noteEdit.draft = inp.value; });
+    inp.placeholder = e.note ? "" : "Note for this session (optional) \u2014 Enter to save, Esc to skip";
+    inp.setAttribute("aria-label", "Note for this session");
+    var done = false;
+    function finish(save) {
+      if (done) return;
+      done = true;
+      noteEdit = null;
+      if (save) saveNote(t, slot, inp.value); else render();
+    }
+    inp.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter") { ev.preventDefault(); finish(true); }
+      if (ev.key === "Escape") { ev.stopPropagation(); finish(false); }
+    });
+    inp.addEventListener("blur", function () { if (!redrawing) finish(true); });
+    setTimeout(function () { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }, 0);
+    return inp;
+  }
+
+  function picker(t) {
+    var box = el("div", "picker");
+    box.addEventListener("click", function (e) { e.stopPropagation(); });
+
+    if (newTypeFor !== t.id) {
+      S.categories.forEach(function (c) {
+        var b = button(c.key === t.category ? "current" : "", null, function () {
+          closePicker();
+          if (c.key !== t.category) write("PUT", "/api/tasks/" + t.id + "/category", { category: c.key }); else render();
+        });
+        b.appendChild(el("span", null, c.label));
+        var hint = el("span", "hint", c.description); hint.title = c.description;
+        b.appendChild(hint);
+        box.appendChild(b);
+      });
+      box.appendChild(el("hr"));
+      box.appendChild(button("", "+ New type\u2026", function () { newTypeFor = t.id; render(); }));
+      return box;
+    }
+
+    var form = el("form");
+    var name = el("input"); name.required = true; name.maxLength = 32; name.placeholder = "e.g. errands";
+    var desc = el("input"); desc.required = true; desc.maxLength = 200; desc.placeholder = "e.g. Paperwork, shopping, appointments";
+    var l1 = el("label", null, "Name"); l1.appendChild(name);
+    var l2 = el("label", null, "What goes in it (Jev uses this to sort)"); l2.appendChild(desc);
+    var actions = el("div", "actions");
+    actions.appendChild(button("", "Cancel", function () { newTypeFor = null; render(); }));
+    var save = el("button", null, "Create"); save.type = "submit";
+    actions.appendChild(save);
+    form.appendChild(l1); form.appendChild(l2); form.appendChild(actions);
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var label = name.value.trim(), description = desc.value.trim();
+      if (!label || !description) return;
+      closePicker();
+      write("POST", "/api/categories", { label: label, description: description, task_id: t.id }, "Creating " + label + "\u2026");
+    });
+    box.appendChild(form);
+    setTimeout(function () { name.focus(); }, 0);
+    return box;
+  }
+
+  // close the picker on outside click / Escape
+  document.addEventListener("click", function () { if (pickerFor !== null) { closePicker(); render(); } });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && pickerFor !== null) { closePicker(); render(); } });
+  // refresh when coming back to the window (new day, edits made elsewhere)
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) load(); });
+  window.addEventListener("focus", load);
+
+  render();
+  load();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+# ── secrets ──────────────────────────────────────────────
+# API keys live here. Never commit; see .env.example for the names.
+.env
+.env.*
+!.env.example
+
+# ── personal data (lives on this machine only) ───────────
+# Your own plan: tasks, dates, events. Copy the example and edit it.
+# plan.example.py (the generic starting point) IS committed; plan.py is not.
+/plan.py
+# My own operations notes (lab, deadlines, scripts). Generic docs live in README.md.
+/PLAN.md
+# The board's database: ticks, notes, pages. Rebuild the plan with `uv run seed.py`.
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite
+*.sqlite3
+# Weekly log written by the Sunday check
+LOG.md
+
+# ── generated ────────────────────────────────────────────
+# Python environment: `uv sync` recreates it from uv.lock
+.venv/
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+build/
+dist/
+
+# Server output
+*.log
+
+# Mac app build output (app/build.sh writes to ~/Applications)
+*.app/
+*.icns
+*.iconset/
+
+# ── OS / editor ──────────────────────────────────────────
+.DS_Store
+.vscode/
+.idea/
+*.swp
