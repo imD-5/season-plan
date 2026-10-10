@@ -24,6 +24,7 @@ from season.domain.model import (
     check_pages,
     clean_note,
     clean_task_text,
+    parse_size,
 )
 
 from .plan import Plan
@@ -186,8 +187,15 @@ class AddTask:
     def __init__(self, uow: UnitOfWorkFactory, classifier: Classifier, policy: ClassificationPolicy) -> None:
         self._uow, self._classifier, self._policy = uow, classifier, policy
 
-    def __call__(self, week_start: date, text: str) -> Task:
-        text = clean_task_text(text)
+    def __call__(self, week_start: date, text: str, sessions: int | None = None,
+                 hours_each: float | None = None) -> Task:
+        """Size comes from the arguments, else from a trailing "3x2h" in the text, else 1 box of 1h."""
+        text, parsed_sessions, parsed_hours = parse_size(clean_task_text(text))
+        sessions = sessions if sessions is not None else parsed_sessions
+        hours_each = hours_each if hours_each is not None else parsed_hours
+        size = {k: v for k, v in (("sessions", sessions), ("hours_each", hours_each)) if v is not None}
+        Task.new_user_task(week_start, "check", text, CategoryAssignment(OTHER, AssignedBy.FALLBACK), 0,
+                           **size)          # validate before spending a classifier call
         with self._uow() as u:
             if not u.weeks.exists(week_start):
                 raise NotFound(f"no week starting {week_start}")
@@ -195,8 +203,22 @@ class AddTask:
         assignment = _classify(self._classifier, self._policy, text, categories)
         with self._uow() as u:
             task = Task.new_user_task(week_start, "added-" + uuid.uuid4().hex[:8], text,
-                                      assignment, u.tasks.next_position(week_start))
+                                      assignment, u.tasks.next_position(week_start), **size)
             return u.tasks.add(task)
+
+
+class ResizeTask:
+    """Change how many boxes a task has and the hours per box. Works on planned tasks too;
+    re-seeding the plan keeps a size you set by hand."""
+
+    def __init__(self, uow: UnitOfWorkFactory) -> None:
+        self._uow = uow
+
+    def __call__(self, task_id: int, sessions: int, hours_each: float) -> Task:
+        with self._uow() as u:
+            task = u.tasks.get(task_id).resized(sessions, hours_each)
+            u.tasks.resize(task_id, task.sessions, task.hours_each)
+            return task
 
 
 class RemoveTask:

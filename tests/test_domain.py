@@ -12,7 +12,9 @@ from season.domain.model import (
     SessionMark,
     Task,
     check_pages,
+    check_size,
     clean_task_text,
+    parse_size,
 )
 
 
@@ -76,6 +78,39 @@ class ProblemQueueTest(unittest.TestCase):
         q = self.q.advanced()
         self.assertEqual(q.rewound_for(117).position, 0)
         self.assertEqual(q.rewound_for(999).position, 1)
+
+
+class SizeTest(unittest.TestCase):
+    def test_parse_shorthand(self):
+        cases = {
+            "Read papers 3x2h": ("Read papers", 3, 2.0),
+            "Read papers 3 × 1.5h": ("Read papers", 3, 1.5),
+            "Read papers 2X1H": ("Read papers", 2, 1.0),
+            "Draft intro 2h": ("Draft intro", None, 2.0),
+            "Exercises 4x": ("Exercises", 4, None),
+            "Call Kenji 30m": ("Call Kenji", None, 0.5),
+            "Call Kenji 20min": ("Call Kenji", None, 0.5),
+            "Ch.2 section 3": ("Ch.2 section 3", None, None),     # a bare number is not a size
+            "Review 2026 plan": ("Review 2026 plan", None, None),
+            "2h": ("2h", None, None),                             # nothing left: keep as text
+        }
+        for text, want in cases.items():
+            with self.subTest(text=text):
+                self.assertEqual(parse_size(text), want)
+
+    def test_check_size_bounds(self):
+        self.assertEqual(check_size(3, 1.5), (3, 1.5))
+        self.assertEqual(check_size(1, 0), (1, 0.0))
+        for bad in ((0, 1), (13, 1), (2, 8.5), (2, 1.25), (2, -1), (True, 1), (2.0, 1)):
+            with self.subTest(size=bad), self.assertRaises(InvalidInput):
+                check_size(*bad)
+
+    def test_resize_keeps_checked_boxes(self):
+        t = _task(sessions=3, marks={1: SessionMark(date(2026, 10, 12))})
+        self.assertEqual(t.checked_up_to, 2)
+        self.assertEqual(t.resized(2, 1.5).sessions, 2)
+        with self.assertRaises(InvalidInput):
+            t.resized(1, 2)
 
 
 class PagesTest(unittest.TestCase):

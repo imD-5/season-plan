@@ -6,7 +6,9 @@
     DELETE /api/tasks/{id}/slots/{slot}        uncheck it; the reply carries `undo`
     POST   /api/tasks/{id}/slots/{slot}/restore {d, problem, note}  undo an uncheck
     PUT    /api/tasks/{id}/slots/{slot}/note   {note}        add/change/clear (null or "") the note
-    POST   /api/tasks                          {week, text}  add; Jev picks the type
+    POST   /api/tasks                          {week, text, sessions?, hours?}  add; Jev picks the type
+                                               ("Read papers 3x2h" in text also sets the size)
+    PUT    /api/tasks/{id}/size                {sessions, hours}  boxes and hours per box
     DELETE /api/tasks/{id}                     remove a task you added
     PUT    /api/tasks/{id}/category            {category}    pick the type by hand
     POST   /api/categories                     {label, description, task_id?}
@@ -69,8 +71,24 @@ def _optional_int(body: dict, key: str) -> int | None:
     return None if body.get(key) is None else _int(body, key)
 
 
+def _hours(body: dict, key: str) -> float | None:
+    v = body.get(key)
+    if v is None:
+        return None
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        raise InvalidInput(f"{key} must be a number")
+    return float(v)
+
+
+def _required_hours(body: dict) -> float:
+    hours = _hours(body, "hours")
+    if hours is None:
+        raise InvalidInput("hours must be a number")
+    return hours
+
+
 def _add_task(app: App, m: re.Match, b: dict) -> Reply | None:
-    task = app.add_task(_date(b, "week"), _str(b, "text"))
+    task = app.add_task(_date(b, "week"), _str(b, "text"), _optional_int(b, "sessions"), _hours(b, "hours"))
     if task.assigned_by == "fallback":
         return Reply("Couldn't tell the type, so it's under other. Click the type to change it.")
     return None
@@ -111,6 +129,8 @@ ROUTES: list[tuple[str, re.Pattern, Handler]] = [
     ("POST", re.compile(r"/api/tasks"), _add_task),
     ("DELETE", re.compile(r"/api/tasks/(\d+)"),
      lambda app, m, b: app.remove_task(int(m[1]))),
+    ("PUT", re.compile(r"/api/tasks/(\d+)/size"),
+     lambda app, m, b: app.resize_task(int(m[1]), _int(b, "sessions"), _required_hours(b))),
     ("PUT", re.compile(r"/api/tasks/(\d+)/category"),
      lambda app, m, b: app.assign_category(int(m[1]), _str(b, "category"))),
     ("POST", re.compile(r"/api/categories"), _create_category),

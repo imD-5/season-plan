@@ -25,7 +25,7 @@ from season.domain.model import (
     Week,
 )
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS weeks (
@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   hours_each  REAL NOT NULL DEFAULT 0,
   position    INTEGER NOT NULL DEFAULT 0,
   user_added  INTEGER NOT NULL DEFAULT 0,
+  resized     INTEGER NOT NULL DEFAULT 0,
   UNIQUE (week_start, key)
 );
 CREATE TABLE IF NOT EXISTS sessions (
@@ -162,6 +163,8 @@ class SqliteDatabase:
             _run(con, _SCHEMA)
             if "note" not in _columns(con, "sessions"):   # v1 -> v2
                 con.execute("ALTER TABLE sessions ADD COLUMN note TEXT")
+            if "resized" not in _columns(con, "tasks"):   # v2 -> v3
+                con.execute("ALTER TABLE tasks ADD COLUMN resized INTEGER NOT NULL DEFAULT 0")
             con.execute("INSERT OR IGNORE INTO categories(key, label, description, builtin, position) "
                         "VALUES(?,?,?,?,?)", _OTHER_ROW)
             problems = con.execute("PRAGMA foreign_key_check").fetchall()
@@ -255,6 +258,10 @@ class _Tasks:
                           "problem = excluded.problem, note = excluded.note",
                           (task_id, slot, mark.done_on.isoformat(), mark.problem, mark.note))
 
+    def resize(self, task_id: int, sessions: int, hours_each: float) -> None:
+        self._con.execute("UPDATE tasks SET sessions = ?, hours_each = ?, resized = 1 WHERE id = ?",
+                          (sessions, hours_each, task_id))
+
     def set_note(self, task_id: int, slot: int, note: str | None) -> None:
         self._con.execute("UPDATE sessions SET note = ? WHERE task_id = ? AND slot = ?", (note, task_id, slot))
 
@@ -275,8 +282,10 @@ class _Tasks:
         self._con.execute(
             "INSERT INTO tasks(week_start, key, text, category, assigned_by, confidence, sessions, hours_each, "
             "position, user_added) VALUES(?,?,?,?,?,NULL,?,?,?,0) "
-            "ON CONFLICT(week_start, key) DO UPDATE SET text = excluded.text, sessions = excluded.sessions, "
-            "hours_each = excluded.hours_each, position = excluded.position, "
+            "ON CONFLICT(week_start, key) DO UPDATE SET text = excluded.text, "
+            "sessions = CASE WHEN tasks.resized THEN tasks.sessions ELSE excluded.sessions END, "
+            "hours_each = CASE WHEN tasks.resized THEN tasks.hours_each ELSE excluded.hours_each END, "
+            "position = excluded.position, "
             "category = CASE WHEN tasks.assigned_by = 'manual' THEN tasks.category ELSE excluded.category END",
             (task.week_start.isoformat(), task.key, task.text, task.category, AssignedBy.PLAN.value,
              task.sessions, task.hours_each, task.position))

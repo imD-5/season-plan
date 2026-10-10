@@ -22,6 +22,7 @@ class App:
     set_session_note: uc.SetSessionNote
     skip_problem: uc.SkipProblem
     add_task: uc.AddTask
+    resize_task: uc.ResizeTask
     remove_task: uc.RemoveTask
     assign_category: uc.AssignCategory
     create_category: uc.CreateCategory
@@ -51,6 +52,7 @@ def build_app(settings: Settings, *, classifier: Classifier | None = None,
         set_session_note=uc.SetSessionNote(uow),
         skip_problem=uc.SkipProblem(uow),
         add_task=uc.AddTask(uow, classifier, policy),
+        resize_task=uc.ResizeTask(uow),
         remove_task=uc.RemoveTask(uow),
         assign_category=uc.AssignCategory(uow),
         create_category=uc.CreateCategory(uow, classifier, policy),

@@ -36,6 +36,7 @@ def _task(t: Task) -> dict:
         "each": t.hours_each,
         "user_added": t.user_added,
         "problem_list": t.tracks_problem_list,
+        "min_sessions": max(1, t.checked_up_to),
         "slots": [None if m is None else mark_json(m) for m in t.slots],
     }
 

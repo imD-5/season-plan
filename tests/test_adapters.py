@@ -127,6 +127,25 @@ class SqliteMigrationTest(unittest.TestCase):
             with db.unit_of_work() as u:
                 self.assertEqual(u.weeks.all()[0].tasks[0].slots[0].note, "two pointers")
 
+    def test_v2_file_gains_resized_column_and_keeps_data(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "v2.db"
+            con = sqlite3.connect(path)
+            con.executescript(V0)
+            con.close()
+            db = SqliteDatabase(path)
+            db.migrate()
+            raw = sqlite3.connect(path)   # make it look like a v2 file
+            raw.executescript("ALTER TABLE tasks DROP COLUMN resized; PRAGMA user_version = 2;")
+            raw.close()
+            db.migrate()
+            with db.unit_of_work() as u:
+                self.assertEqual(u.weeks.all()[0].tasks[0].slots[0].problem, 117)
+                u.tasks.resize(1, 4, 1.5)
+            with db.unit_of_work() as u:
+                t = u.weeks.all()[0].tasks[0]
+                self.assertEqual((t.sessions, t.hours_each), (4, 1.5))
+
     def test_unit_of_work_rolls_back_on_error(self):
         with tempfile.TemporaryDirectory() as tmp:
             db = SqliteDatabase(Path(tmp) / "x.db")

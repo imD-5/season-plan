@@ -91,6 +91,21 @@ class HttpTest(unittest.TestCase):
         self.assertIsNone(board["weeks"][0]["tasks"][0]["slots"][0]["note"])
         self.assertEqual(self.call("PUT", base + "/note", {"note": 5})[0], 400)
 
+    def test_task_size_over_http(self):
+        _, board = self.call("POST", "/api/tasks", {"week": "2026-10-12", "text": "Read papers 3x2h"})
+        added = [t for t in board["weeks"][0]["tasks"] if t["user_added"]][0]
+        self.assertEqual((added["text"], added["sessions"], added["each"]), ("Read papers", 3, 2.0))
+        status, board = self.call("PUT", f"/api/tasks/{added['id']}/size", {"sessions": 5, "hours": 1.5})
+        got = [t for t in board["weeks"][0]["tasks"] if t["id"] == added["id"]][0]
+        self.assertEqual((status, got["sessions"], got["each"], len(got["slots"])), (200, 5, 1.5, 5))
+        self.call("POST", f"/api/tasks/{added['id']}/slots/3")
+        _, board = self.call("GET", "/api/board")
+        got = [t for t in board["weeks"][0]["tasks"] if t["id"] == added["id"]][0]
+        self.assertEqual(got["min_sessions"], 4)
+        self.assertEqual(self.call("PUT", f"/api/tasks/{added['id']}/size", {"sessions": 2, "hours": 1})[0], 400)
+        self.assertEqual(self.call("PUT", f"/api/tasks/{added['id']}/size", {"sessions": 5})[0], 400)
+        self.assertEqual(self.call("PUT", f"/api/tasks/{added['id']}/size", {"sessions": "5", "hours": 1})[0], 400)
+
     def test_cross_site_writes_are_refused(self):
         tid = task(self.app, 0, "thesis").id
         self.assertEqual(self.call("POST", f"/api/tasks/{tid}/slots/0", headers={"X-Requested-With": ""})[0], 403)

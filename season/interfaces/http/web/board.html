@@ -80,9 +80,27 @@
   .box[aria-pressed="true"] { background: #f3f0e8; }
   li:hover .box[aria-pressed="false"] { background: rgba(243,240,232,0.12); }
   .box[aria-pressed="false"]:hover { background: rgba(243,240,232,0.35) !important; }
-  .time { font-size: 12px; color: #6a665e; text-align: right; font-variant-numeric: tabular-nums; }
+  .time { justify-self: end; min-width: 56px; background: none; border: 0; padding: 4px 6px; margin-right: -6px;
+          font-size: 12px; color: #6a665e; text-align: right; font-variant-numeric: tabular-nums;
+          transition: background 120ms, color 120ms; }
   li:hover .time { color: #9c978c; }
   li.done .time { color: #4a4741; }
+  .time:hover, .time.open { background: rgba(243,240,232,0.1); color: #f3f0e8 !important; }
+  .time.unset { color: #4a4741; }
+
+  /* size popover: boxes and hours per box */
+  .sizer { position: absolute; top: 36px; right: 4px; z-index: 20; width: 230px; padding: 10px 12px;
+           background: #1d1c19; border: 1px solid #3a3731; box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+           cursor: default; display: grid; gap: 8px; }
+  .sizer .line { display: grid; grid-template-columns: 1fr 34px 52px 34px; align-items: center; gap: 4px;
+                 font-size: 12px; color: #9c978c; }
+  .sizer .val { text-align: center; font-size: 15px; color: #f3f0e8; font-variant-numeric: tabular-nums; }
+  .sizer .step { height: 34px; background: none; border: 1px solid #3a3731; font-size: 16px; color: #d8d4ca;
+                 transition: background 120ms, border-color 120ms; }
+  .sizer .step:hover:not(:disabled) { background: rgba(243,240,232,0.1); border-color: #6a665e; color: #f3f0e8; }
+  .sizer .step:disabled { color: #3a3731; cursor: not-allowed; }
+  .sizer .total { font-size: 11px; color: #6a665e; }
+  .add-hint { padding-top: 6px; font-size: 11px; color: #6a665e; }
 
   /* type picker */
   .picker { position: absolute; top: 36px; left: 4px; z-index: 20; width: 260px; padding: 4px 0;
@@ -143,6 +161,7 @@
   var adding = false;
   var editingPages = false;
   var pickerFor = null;      // task id whose type picker is open
+  var sizeFor = null;        // task id whose box/hours control is open
   var newTypeFor = null;     // task id the "new type" form is for
   var status = { text: "", error: false };
   var noteEdit = null;       // {task, slot, draft} whose note field is open
@@ -158,11 +177,11 @@
     });
   }
   function load() {
-    if (pickerFor !== null || adding || noteEdit) return Promise.resolve();
+    if (anyPopup() || adding || noteEdit) return Promise.resolve();
     return api("GET", "/api/board")
       .then(function (b) {
         S = b; if (weekIndex === null) weekIndex = pickWeek();
-        if (pickerFor === null && !adding && !noteEdit && !editingPages) render();
+        if (!anyPopup() && !adding && !noteEdit && !editingPages) render();
       })
       .catch(function () { setStatus("Can't reach the board server.", true); });
   }
@@ -228,7 +247,11 @@
     return c ? c.label : key;
   }
   function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
-  function timeText(t) { if (!t.each) return ""; return t.sessions === 1 ? t.each + "h" : t.sessions + " \u00d7 " + t.each + "h"; }
+  function hoursText(h) { return h === 0.5 ? "30m" : h + "h"; }
+  function timeText(t) {
+    if (!t.each) return t.sessions === 1 ? "+ time" : t.sessions + " boxes";
+    return t.sessions === 1 ? hoursText(t.each) : t.sessions + " \u00d7 " + hoursText(t.each);
+  }
   function doneLabel(t, e) {
     if (t.problem_list) return "LC " + (e.problem || "");
     return t.user_added ? t.text : cap(categoryLabel(t.category));
@@ -259,7 +282,8 @@
       manual: "You picked this. Click to change."
     }[t.assigned_by] || "Click to change";
   }
-  function closePicker() { pickerFor = null; newTypeFor = null; }
+  function closePicker() { pickerFor = null; newTypeFor = null; sizeFor = null; }
+  function anyPopup() { return pickerFor !== null || sizeFor !== null; }
 
   // ── render ─────────────────────────────────────────────────────────────
   function render() {
@@ -342,7 +366,7 @@
 
     if (adding) {
       var ai = el("input", "add-input");
-      ai.placeholder = "New task for this week"; ai.setAttribute("aria-label", "New task"); ai.maxLength = 160;
+      ai.placeholder = "New task, e.g. Read related papers 3x2h"; ai.setAttribute("aria-label", "New task"); ai.maxLength = 160;
       ai.addEventListener("keydown", function (e) { if (e.key === "Enter") ai.blur(); if (e.key === "Escape") { ai.value = ""; ai.blur(); } });
       ai.addEventListener("blur", function () {
         if (redrawing || !adding) return;
@@ -352,6 +376,7 @@
         else render();
       });
       root.appendChild(ai);
+      root.appendChild(el("p", "add-hint", "End with 3x2h for 3 boxes of 2h \u00b7 2h or 30m for one box \u00b7 nothing = 1 box of 1h. Change it later by clicking the time."));
       setTimeout(function () { ai.focus(); }, 0);
     } else {
       root.appendChild(button("add", "+ Add to this week", function () { closePicker(); adding = true; render(); }));
@@ -407,10 +432,17 @@
       boxes.appendChild(b);
     });
     li.appendChild(boxes);
-    li.appendChild(el("span", "time", timeText(t)));
+    var time = button("time" + (t.each ? "" : " unset") + (sizeFor === t.id ? " open" : ""), timeText(t), function () {
+      var open = sizeFor === t.id;
+      closePicker(); noteEdit = null;
+      sizeFor = open ? null : t.id;
+      render();
+    });
+    time.title = "Change boxes and hours";
+    li.appendChild(time);
 
     li.addEventListener("click", function () {
-      if (pickerFor !== null) { closePicker(); render(); return; }
+      if (anyPopup()) { closePicker(); render(); return; }
       var next = t.slots.indexOf(null);
       if (next >= 0) check(t, next); else uncheck(t, t.slots.length - 1);
     });
@@ -418,6 +450,7 @@
     var notes = notesBlock(t);
     if (notes) li.appendChild(notes);
     if (pickerFor === t.id) li.appendChild(picker(t));
+    if (sizeFor === t.id) li.appendChild(sizer(t));
     return li;
   }
 
@@ -467,6 +500,33 @@
     return inp;
   }
 
+  // boxes and hours per box; every click saves
+  function sizer(t) {
+    var box = el("div", "sizer");
+    box.addEventListener("click", function (e) { e.stopPropagation(); });
+    function save(sessions, hours) {
+      write("PUT", "/api/tasks/" + t.id + "/size", { sessions: sessions, hours: hours });
+    }
+    function line(label, value, canDown, canUp, down, up, downTitle) {
+      var row = el("div", "line");
+      row.appendChild(el("span", null, label));
+      var minus = button("step", "\u2212", down); minus.disabled = !canDown; if (downTitle) minus.title = downTitle;
+      row.appendChild(minus);
+      row.appendChild(el("span", "val", value));
+      var plus = button("step", "+", up); plus.disabled = !canUp;
+      row.appendChild(plus);
+      return row;
+    }
+    var min = t.min_sessions || 1, n = t.sessions, h = t.each;
+    box.appendChild(line("Boxes", String(n), n > min, n < 12,
+      function () { save(n - 1, h); }, function () { save(n + 1, h); },
+      n <= min && min > 1 ? "Box " + min + " is checked. Uncheck it to go lower." : ""));
+    box.appendChild(line("Hours each", h ? hoursText(h) : "\u2014", h > 0, h < 8,
+      function () { save(n, Math.max(0, h - 0.5)); }, function () { save(n, Math.min(8, h + 0.5)); }));
+    box.appendChild(el("div", "total", h ? "About " + (n * h) + "h this week" : "No time estimate"));
+    return box;
+  }
+
   function picker(t) {
     var box = el("div", "picker");
     box.addEventListener("click", function (e) { e.stopPropagation(); });
@@ -510,8 +570,8 @@
   }
 
   // close the picker on outside click / Escape
-  document.addEventListener("click", function () { if (pickerFor !== null) { closePicker(); render(); } });
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && pickerFor !== null) { closePicker(); render(); } });
+  document.addEventListener("click", function () { if (anyPopup()) { closePicker(); render(); } });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && anyPopup()) { closePicker(); render(); } });
   // refresh when coming back to the window (new day, edits made elsewhere)
   document.addEventListener("visibilitychange", function () { if (!document.hidden) load(); });
   window.addEventListener("focus", load);

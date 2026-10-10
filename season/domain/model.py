@@ -21,6 +21,10 @@ PROBLEM_LIST_TASK_KEY = "lc"
 PAGES_TARGET = 100
 MAX_TASK_TEXT = 160
 MAX_NOTE = 500
+MAX_SESSIONS = 12          # boxes per task per week
+MAX_HOURS_EACH = 8.0       # hours per box; 0 means "no estimate"
+DEFAULT_SESSIONS = 1
+DEFAULT_HOURS_EACH = 1.0
 MAX_CATEGORY_LABEL = 32
 MAX_CATEGORY_DESCRIPTION = 200
 
@@ -108,6 +112,39 @@ def clean_task_text(text: str) -> str:
     return text
 
 
+def check_size(sessions: int, hours_each: float) -> tuple[int, float]:
+    """Boxes are whole numbers 1-12; hours go in half-hour steps up to 8 (0 = no estimate)."""
+    if isinstance(sessions, bool) or not isinstance(sessions, int) or not 1 <= sessions <= MAX_SESSIONS:
+        raise InvalidInput(f"boxes must be a whole number from 1 to {MAX_SESSIONS}")
+    if isinstance(hours_each, bool) or not isinstance(hours_each, (int, float)):
+        raise InvalidInput("hours must be a number")
+    hours = float(hours_each)
+    if not 0 <= hours <= MAX_HOURS_EACH or (hours * 2) != int(hours * 2):
+        raise InvalidInput(f"hours must be 0 to {MAX_HOURS_EACH:g} in half-hour steps")
+    return sessions, hours
+
+
+# "Read papers 3x2h", "Read papers 3 × 1.5h", "Call Kenji 30m", "Draft intro 2h", "Exercises 4x"
+_SIZE = re.compile(
+    r"\s+(?:(?P<n>\d{1,2})\s*[x×*]\s*)?(?:(?P<h>\d+(?:\.\d+)?)\s*h|(?P<m>\d{1,3})\s*m(?:in)?)?\s*$",
+    re.IGNORECASE)
+
+
+def parse_size(text: str) -> tuple[str, int | None, float | None]:
+    """Split a trailing size off task text. Returns (text, sessions, hours); None where not given."""
+    m = _SIZE.search(text)
+    if not m or not (m["n"] or m["h"] or m["m"]):
+        return text, None, None
+    rest = text[:m.start()].rstrip()
+    if not rest:                    # the whole thing was a size; treat as text
+        return text, None, None
+    sessions = int(m["n"]) if m["n"] else None
+    hours = float(m["h"]) if m["h"] else (int(m["m"]) / 60 if m["m"] else None)
+    if hours is not None:
+        hours = round(hours * 2) / 2 or 0.5      # nearest half hour; "20m" is still half an hour
+    return rest, sessions, hours
+
+
 @dataclass(frozen=True, slots=True)
 class Task:
     id: int
@@ -124,12 +161,26 @@ class Task:
     marks: Mapping[int, SessionMark] = field(default_factory=dict)
 
     @classmethod
-    def new_user_task(cls, week_start: date, key: str, text: str,
-                      assignment: CategoryAssignment, position: int) -> Task:
+    def new_user_task(cls, week_start: date, key: str, text: str, assignment: CategoryAssignment,
+                      position: int, sessions: int = DEFAULT_SESSIONS,
+                      hours_each: float = DEFAULT_HOURS_EACH) -> Task:
+        sessions, hours_each = check_size(sessions, hours_each)
         return cls(id=0, week_start=week_start, key=key, text=clean_task_text(text),
                    category=assignment.category, assigned_by=assignment.assigned_by,
-                   confidence=assignment.confidence, sessions=1, hours_each=0.0,
+                   confidence=assignment.confidence, sessions=sessions, hours_each=hours_each,
                    position=position, user_added=True)
+
+    @property
+    def checked_up_to(self) -> int:
+        """Smallest box count that keeps every checked box."""
+        return max(self.marks, default=-1) + 1
+
+    def resized(self, sessions: int, hours_each: float) -> Task:
+        sessions, hours_each = check_size(sessions, hours_each)
+        if sessions < self.checked_up_to:
+            raise InvalidInput(f"box {self.checked_up_to} is checked; uncheck it before going below "
+                               f"{self.checked_up_to} boxes")
+        return replace(self, sessions=sessions, hours_each=hours_each)
 
     @property
     def slots(self) -> list[SessionMark | None]:

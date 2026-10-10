@@ -132,6 +132,58 @@ class AddTaskTest(unittest.TestCase):
         self.app.remove_task(t.id)
         self.assertNotIn(t.id, [x.id for x in self.app.get_board().weeks[0].tasks])
 
+    def test_size_from_shorthand_or_arguments(self):
+        self.app, self.tmp = make_app()
+        t = self.app.add_task(MONDAY, "Read related papers 3x2h")
+        self.assertEqual((t.text, t.sessions, t.hours_each), ("Read related papers", 3, 2.0))
+        t = self.app.add_task(MONDAY, "Buy ski wax")
+        self.assertEqual((t.sessions, t.hours_each), (1, 1.0))           # default: 1 box of 1h
+        t = self.app.add_task(MONDAY, "Mock interview 2h", sessions=2)   # argument wins, shorthand fills in
+        self.assertEqual((t.text, t.sessions, t.hours_each), ("Mock interview", 2, 2.0))
+
+    def test_bad_size_is_rejected_before_classifying(self):
+        classifier = ScriptedClassifier()
+        self.app, self.tmp = make_app(classifier)
+        with self.assertRaises(InvalidInput):
+            self.app.add_task(MONDAY, "Too much 20x1h")
+        self.assertEqual(classifier.calls, [])
+
+
+class ResizeTest(unittest.TestCase):
+    def setUp(self):
+        self.app, self.tmp = make_app()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_resize_added_and_planned(self):
+        added = self.app.add_task(MONDAY, "Buy ski wax")
+        self.app.resize_task(added.id, 4, 0.5)
+        got = next(t for t in self.app.get_board().weeks[0].tasks if t.id == added.id)
+        self.assertEqual((got.sessions, got.hours_each), (4, 0.5))
+        thesis = task(self.app, 0, "thesis")
+        self.app.resize_task(thesis.id, 5, 1.5)
+        self.assertEqual((task(self.app, 0, "thesis").sessions, task(self.app, 0, "thesis").hours_each), (5, 1.5))
+
+    def test_cannot_drop_checked_boxes(self):
+        thesis = task(self.app, 0, "thesis")          # 3 boxes in the test plan
+        self.app.mark_session(thesis.id, 2)
+        with self.assertRaises(InvalidInput):
+            self.app.resize_task(thesis.id, 2, 2)
+        self.assertEqual(task(self.app, 0, "thesis").sessions, 3)
+
+    def test_reseed_keeps_hand_set_size(self):
+        from .support import PLAN
+        thesis, lc = task(self.app, 0, "thesis"), task(self.app, 0, "lc")
+        self.app.resize_task(thesis.id, 6, 1)
+        self.app.seed_plan(PLAN)
+        self.assertEqual((task(self.app, 0, "thesis").sessions, task(self.app, 0, "thesis").hours_each), (6, 1.0))
+        self.assertEqual(task(self.app, 0, "lc").sessions, lc.sessions)   # untouched tasks follow the plan
+
+    def test_missing_task(self):
+        with self.assertRaises(NotFound):
+            self.app.resize_task(9999, 2, 1)
+
 
 class CategoryTest(unittest.TestCase):
     def setUp(self):
