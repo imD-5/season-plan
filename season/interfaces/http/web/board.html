@@ -101,6 +101,8 @@
   .sizer .step:disabled { color: #3a3731; cursor: not-allowed; }
   .sizer .total { font-size: 11px; color: #6a665e; }
   .add-hint { padding-top: 6px; font-size: 11px; color: #6a665e; }
+  /* popups flip above the row when there is no room below */
+  .picker.up, .sizer.up { top: auto; bottom: 36px; }
 
   /* type picker */
   .picker { position: absolute; top: 36px; left: 4px; z-index: 20; width: 260px; padding: 4px 0;
@@ -282,6 +284,23 @@
       manual: "You picked this. Click to change."
     }[t.assigned_by] || "Click to change";
   }
+  // Open below the row; if that would run past the bottom of the window, open above it.
+  function placePopup(node) {
+    queueMicrotask(function () {          // after render() attaches it, before the frame paints
+      if (!node.isConnected) return;
+      node.classList.remove("up");
+      var r = node.getBoundingClientRect(), margin = 8;
+      var room = window.innerHeight - margin;
+      if (r.bottom > room) {
+        node.classList.add("up");
+        if (node.getBoundingClientRect().top < margin) {     // fits neither way: keep below, scroll it in
+          node.classList.remove("up");
+          node.scrollIntoView({ block: "nearest" });
+        }
+      }
+    });
+    return node;
+  }
   function closePicker() { pickerFor = null; newTypeFor = null; sizeFor = null; }
   function anyPopup() { return pickerFor !== null || sizeFor !== null; }
 
@@ -449,8 +468,8 @@
 
     var notes = notesBlock(t);
     if (notes) li.appendChild(notes);
-    if (pickerFor === t.id) li.appendChild(picker(t));
-    if (sizeFor === t.id) li.appendChild(sizer(t));
+    if (pickerFor === t.id) li.appendChild(placePopup(picker(t)));
+    if (sizeFor === t.id) li.appendChild(placePopup(sizer(t)));
     return li;
   }
 
