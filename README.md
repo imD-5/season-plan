@@ -51,6 +51,15 @@ running. No admin rights needed. To undo: the same command with `-Remove`.
 
 Without the installers, `uv run serve.py` starts the server and the board is at http://127.0.0.1:8765/.
 
+**On your iPhone** (through [Tailscale](https://tailscale.com), so only your own devices can reach it)
+
+1. On the Mac: `tailscale serve --bg 8765` and note the `https://…ts.net` address it prints.
+2. Put that address in `.env` as `SEASON_ALLOWED_ORIGINS=https://…ts.net` and restart the server.
+3. On the iPhone: sign in to the Tailscale app with the same account, open the address in Safari,
+   then Share → **Add to Home Screen**.
+
+The board then opens full screen from its own icon. The Mac has to be on; the data stays on the Mac.
+
 The plan (weeks, events, types, the numbered problem queue) is plain data in `plan.py`. **It is yours and
 git-ignored** — `plan.example.py` is the generic starting point, and `plan.py` is what the board actually
 reads. Edit it any time and re-run `uv run seed.py`; ticks, notes, added tasks and manually chosen types

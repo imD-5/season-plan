@@ -2,6 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121210">
+<!-- Home Screen web app on iPhone: own window, no Safari bars -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Season">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
 <title>Season board</title>
 <!-- Presentation only. Data and rules live behind /api (see season/interfaces/http/server.py). -->
 <style>
@@ -12,7 +21,12 @@
                font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
                -webkit-user-select: none; user-select: none; }
   input { -webkit-user-select: text; user-select: text; }
-  #board { box-sizing: border-box; width: 100%; max-width: 760px; margin: 0 auto; padding: 14px 22px 28px; }
+  #board { box-sizing: border-box; width: 100%; max-width: 760px; margin: 0 auto; padding: 14px 22px 28px;
+           /* Home Screen app on a notched iPhone draws under the status bar */
+           padding-top: max(14px, env(safe-area-inset-top));
+           padding-left: max(22px, env(safe-area-inset-left)); padding-right: max(22px, env(safe-area-inset-right));
+           padding-bottom: max(28px, env(safe-area-inset-bottom)); }
+  html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
   #board * { box-sizing: border-box; }
   button, input { font: inherit; color: inherit; }
   button { cursor: pointer; }
@@ -107,6 +121,7 @@
   /* popups flip above the row when there is no room below */
   .picker.up, .sizer.up { top: auto; bottom: 36px; }
 
+
   /* type picker */
   .picker { position: absolute; top: 36px; left: 4px; z-index: 20; width: 260px; padding: 4px 0;
             background: #1d1c19; border: 1px solid #3a3731; box-shadow: 0 8px 24px rgba(0,0,0,0.45);
@@ -150,6 +165,49 @@
   .note-input { width: 100%; background: transparent; border: 0; border-bottom: 1px solid #4a4741;
                 color: #f3f0e8; font-size: 13px; padding: 4px 0; }
   .note-input::placeholder { color: #6a665e; }
+
+  /* ── touch screens: nothing may depend on hover ───────────────────── */
+  @media (hover: none) {
+    .rm, .note .x { visibility: visible; }
+    .rm { color: #6a665e; padding: 6px 4px 6px 12px; }
+    .note .x { color: #6a665e; padding: 4px 8px; }
+    li:hover { background: none; }
+    li:active { background: rgba(243,240,232,0.07); }
+  }
+
+  /* ── phone width ───────────────────────────────────────────────────── */
+  @media (max-width: 560px) {
+    #board { padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); }
+    h1 { font-size: 20px; }
+    .meta { gap: 10px; font-size: 12px; }
+    .season { gap: 10px 12px; }
+    .dots { gap: 6px; }
+    .tick { width: 16px; height: 16px; }
+
+    .days { gap: 2px; }
+    .day { min-height: 60px; padding: 5px 3px; }
+    .dn { font-size: 10px; }
+    .ev, .did { font-size: 10px; }
+
+    /* task row: name on its own line; type, boxes and time underneath */
+    li { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "name name name" "tag boxes time";
+         row-gap: 6px; column-gap: 10px; padding-top: 10px; padding-bottom: 10px; margin: 0 -14px;
+         padding-left: 14px; padding-right: 14px; }
+    li .name { grid-area: name; font-size: 16px; }
+    li .tag { grid-area: tag; }
+    li .boxes { grid-area: boxes; justify-self: end; gap: 8px; }
+    li .time { grid-area: time; min-width: 0; }
+    .box { width: 24px; height: 24px; }
+    .box::before { inset: -4px; }
+    .notes { grid-column: 1 / -1; padding-bottom: 0; }
+    .sizer .step { height: 40px; }
+    .sizer .line { grid-template-columns: 1fr 44px 52px 44px; }
+    .picker button { padding: 10px 12px; }
+    .add { margin: 4px -14px 0; width: calc(100% + 28px); padding: 0 14px; min-height: 48px; }
+
+    /* iOS zooms into any text field under 16px on focus */
+    .add-input, .note-input, .pages-input, .picker input { font-size: 16px; }
+  }
 </style>
 </head>
 <body>

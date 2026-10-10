@@ -34,6 +34,13 @@ from season.domain.model import SessionMark
 from .presenter import Reply, Undo, board_json
 
 WEB = Path(__file__).resolve().parent / "web"
+# Files the board page needs besides itself (Home Screen icon, app manifest). Fixed list, no path lookups.
+STATIC = {
+    "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json"),
+    "/apple-touch-icon.png": ("icon-180.png", "image/png"),
+    "/icon-192.png": ("icon-192.png", "image/png"),
+    "/icon-512.png": ("icon-512.png", "image/png"),
+}
 MAX_BODY = 16 * 1024
 
 Handler = Callable[[App, re.Match, dict], Reply | None]
@@ -179,6 +186,9 @@ def make_handler(app: App) -> type[BaseHTTPRequestHandler]:
                 self._send(200, (WEB / "board.html").read_bytes(), "text/html; charset=utf-8")
             elif path == "/api/board":
                 self._json(200, board_json(app.get_board()))
+            elif path in STATIC:
+                name, content_type = STATIC[path]
+                self._send(200, (WEB / name).read_bytes(), content_type)
             else:
                 self._json(404, {"error": "not found"})
 
