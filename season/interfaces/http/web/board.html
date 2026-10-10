@@ -5,7 +5,10 @@
 <title>Season board</title>
 <!-- Presentation only. Data and rules live behind /api (see season/interfaces/http/server.py). -->
 <style>
-  html, body { color-scheme: dark; background: #121210; color: #f3f0e8; margin: 0; overflow-x: hidden;
+  /* overflow-x: clip, not hidden: "hidden" turns <body> into its own scroll box that ends under the
+     last row, which clips popups opened near the bottom even when the window has room. */
+  html { overflow-x: clip; }
+  html, body { color-scheme: dark; background: #121210; color: #f3f0e8; margin: 0; min-height: 100%;
                font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
                -webkit-user-select: none; user-select: none; }
   input { -webkit-user-select: text; user-select: text; }
