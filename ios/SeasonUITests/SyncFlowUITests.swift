@@ -18,8 +18,11 @@ final class SyncFlowUITests: XCTestCase {
         XCTAssertTrue(box.waitForExistence(timeout: 15), "board did not load")
         snapshot(app, "1-board")
 
-        // tick -> note sheet -> save
+        // tick (no pop-up), then long-press for an optional note
         box.tap()
+        XCTAssertEqual(box.value as? String, "done")
+        box.press(forDuration: 1.0)
+        app.buttons["Add note"].tap()
         let field = app.textFields["note-field"].exists ? app.textFields["note-field"] : app.textViews["note-field"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.typeText("written on the phone")

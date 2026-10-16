@@ -286,10 +286,10 @@
   function setStatus(text, isError) { status = { text: text, error: !!isError }; render(); }
   function slotPath(id, slot) { return "/api/tasks/" + id + "/slots/" + slot; }
 
-  // tick → open the note field for that session
+  // tick → just tick; a note is optional and added by right-clicking the box
   function check(t, slot) {
     noteEdit = null;
-    write("POST", slotPath(t.id, slot)).then(function (b) { if (b) { noteEdit = { task: t.id, slot: slot }; render(); } });
+    write("POST", slotPath(t.id, slot));
   }
   // untick → offer Undo, which brings back the date, problem and note
   function uncheck(t, slot) {
@@ -536,7 +536,12 @@
       var b = button("box", null, function () { if (e) uncheck(t, i); else check(t, i); });
       b.setAttribute("aria-pressed", e ? "true" : "false");
       b.title = e ? "Done " + dow(e.d) + " " + Number(e.d.slice(8)) + (e.problem ? " \u00b7 " + e.problem : "")
-                    + (e.note ? "\n" + e.note : "") + "\nClick to uncheck" : "Mark one session done";
+                    + (e.note ? "\n" + e.note : "") + "\nClick to uncheck \u00b7 right-click for a note" : "Mark one session done";
+      if (e) b.addEventListener("contextmenu", function (ev) {
+        ev.preventDefault(); ev.stopPropagation();
+        closePicker(); sizeFor = null;
+        noteEdit = { task: t.id, slot: i }; render();
+      });
       boxes.appendChild(b);
     });
     li.appendChild(boxes);

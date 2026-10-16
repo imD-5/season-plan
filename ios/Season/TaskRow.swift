@@ -1,5 +1,6 @@
 import SeasonCore
 import SwiftUI
+import UIKit
 
 struct TaskRow: View {
     @Environment(Store.self) private var store
@@ -86,6 +87,14 @@ struct TaskRow: View {
                         .padding(4).contentShape(Rectangle())
                 }
                 .padding(-4)
+                .contextMenu {
+                    // a note is optional: long-press a checked box to add or edit it
+                    if let s = slot {
+                        Button(s.note == nil ? "Add note" : "Edit note", systemImage: "square.and.pencil") {
+                            sheet = .note(ref: task.ref, slot: i, title: title, old: s.note, justTicked: false)
+                        }
+                    }
+                }
                 .accessibilityIdentifier("box-\(task.key)-\(i)")
                 .accessibilityValue(slot == nil ? "open" : "done")
             }
@@ -99,7 +108,7 @@ struct TaskRow: View {
                                       op: .restore(task.ref, i, old)))
         } else {
             store.perform(.mark(task.ref, i, on: today))
-            sheet = .note(ref: task.ref, slot: i, title: title, old: nil, justTicked: true)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
     }
 
