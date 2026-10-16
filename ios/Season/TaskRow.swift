@@ -10,7 +10,7 @@ struct TaskRow: View {
     @Binding var sheet: Sheet?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 5) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 name
                 Button { sheet = .size(task) } label: {
@@ -23,13 +23,13 @@ struct TaskRow: View {
                 .accessibilityIdentifier("size-\(task.key)")
             }
             // type chip, then the boxes; boxes wrap onto more lines when there are many
-            FlowLayout(spacing: 8, lineSpacing: 8) {
+            FlowLayout(spacing: 8, lineSpacing: 6) {
                 typeMenu.fixedSize()
                 boxes
             }
             notes
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, 7)
         .contextMenu {
             if task.problemList, board.problem != nil {
                 Button("Skip to the next problem", systemImage: "forward") { store.perform(.skip()) }
@@ -68,7 +68,7 @@ struct TaskRow: View {
             Text(task.assignedBy == "pending" ? "sorting…" : (board.category(task.category)?.label ?? task.category))
                 .font(.caption).lineLimit(1)
                 .foregroundStyle(task.category == "other" ? Theme.amber : Theme.muted)
-                .padding(.vertical, 6).padding(.horizontal, 8)
+                .padding(.vertical, 4).padding(.horizontal, 8)
                 .background(Theme.ink.opacity(0.06))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
         }

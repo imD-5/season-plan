@@ -37,24 +37,25 @@ struct BoardView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header(board, week)
-                ticks(board, selected: wi, current: current, today: today).padding(.top, 16)
+                ticks(board, selected: wi, current: current, today: today).padding(.top, 10)
                 if !week.glance.isEmpty {
-                    Text(week.glance).font(.subheadline).foregroundStyle(Theme.muted).padding(.top, 14)
+                    Text(week.glance).font(.subheadline).foregroundStyle(Theme.muted).lineLimit(2).padding(.top, 8)
                 }
-                dayStrip(board, week, today: today).padding(.top, 12)
+                dayStrip(board, week, today: today).padding(.top, 8)
                 Text("THIS WEEK — PICK ANY").font(.caption2).tracking(1).foregroundStyle(Theme.faint)
-                    .padding(.top, 22).padding(.bottom, 4)
+                    .padding(.top, 14).padding(.bottom, 0)
                 ForEach(week.tasks) { task in
                     TaskRow(task: task, board: board, today: today, sheet: $sheet)
                     Divider().overlay(Theme.line.opacity(0.6))
                 }
                 addField(week)
-                statusLine.padding(.top, 18)
+                statusLine.padding(.top, 4)
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 90)
+            .padding(.bottom, 12)
         }
         .scrollDismissesKeyboard(.interactively)
+        .scrollBounceBehavior(.basedOnSize)
         .solidStatusBar()
         .refreshable { await store.syncNow() }
         .overlay(alignment: .bottom) { banner }
@@ -83,7 +84,7 @@ struct BoardView: View {
             }
             .accessibilityLabel("Settings")
         }
-        .padding(.top, 8)
+        .padding(.top, 2)
     }
 
     static func hours(_ h: Double) -> String { h == h.rounded() ? String(Int(h)) : String(format: "%.1f", h) }
@@ -93,18 +94,18 @@ struct BoardView: View {
     private func ticks(_ board: Board, selected: Int, current: Int, today: String) -> some View {
         let months = Dictionary(grouping: board.weeks.indices) { String(board.weeks[$0].start.prefix(7)) }
         let names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        return FlowLayout(spacing: 16, lineSpacing: 10) {
+        return FlowLayout(spacing: 12, lineSpacing: 8) {
             ForEach(months.keys.sorted(), id: \.self) { month in
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(names[(Int(month.suffix(2)) ?? 1) - 1]).font(.caption2).tracking(1).foregroundStyle(Theme.faint)
-                    HStack(spacing: 7) {
+                    HStack(spacing: 5) {
                         ForEach(months[month]!, id: \.self) { i in
                             let w = board.weeks[i]
                             Button { picked = i == current ? nil : i } label: {
                                 Rectangle()
                                     .fill(i == current ? Theme.ink : (w.end < today ? Theme.edge : .clear))
                                     .overlay(Rectangle().stroke(i == current ? Theme.ink : Theme.edge, lineWidth: 1))
-                                    .frame(width: 18, height: 18)
+                                    .frame(width: 15, height: 15)
                                     .overlay(Rectangle().stroke(Theme.ink, lineWidth: 1).padding(-3)
                                         .opacity(i == selected && i != current ? 1 : 0))
                                     .padding(4).contentShape(Rectangle())
@@ -133,11 +134,16 @@ struct BoardView: View {
                         Text(e.t).font(.system(size: 10, weight: ["me", "due"].contains(e.k) ? .semibold : .regular))
                             .foregroundStyle(Theme.eventColor(e.k)).lineLimit(1)
                     }
-                    ForEach(Array(board.done(on: day).enumerated()), id: \.offset) { _, d in
+                    // at most 3 lines per day so a busy day can't push the board off the screen
+                    let done = board.done(on: day)
+                    ForEach(Array(done.prefix(done.count > 3 ? 2 : 3).enumerated()), id: \.offset) { _, d in
                         Text("✓ \(d.label)").font(.system(size: 10)).foregroundStyle(Theme.green).lineLimit(1)
                     }
+                    if done.count > 3 {
+                        Text("✓ +\(done.count - 2) more").font(.system(size: 10)).foregroundStyle(Theme.green).lineLimit(1)
+                    }
                 }
-                .frame(maxWidth: .infinity, minHeight: 60, alignment: .topLeading)
+                .frame(maxWidth: .infinity, minHeight: 40, alignment: .topLeading)
                 .padding(.horizontal, 3).padding(.vertical, 5)
                 .background(day == today ? Theme.ink.opacity(0.06) : .clear)
                 .overlay(alignment: .top) { Rectangle().fill(day == today ? Theme.ink : Theme.line).frame(height: day == today ? 2 : 1) }
@@ -155,7 +161,7 @@ struct BoardView: View {
                 .focused($adding)
                 .submitLabel(.done)
                 .onSubmit { add(to: week) }
-                .padding(.vertical, 14)
+                .padding(.vertical, 10)
                 .accessibilityIdentifier("add-field")
             if adding {
                 Text("End with 3x2h for 3 boxes of 2h · 2h or 30m for one box · nothing = 1 box of 1h")
