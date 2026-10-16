@@ -1,0 +1,11 @@
+// Copy to Local.xcconfig (git-ignored) and fill in.
+
+// Your Apple team id: Xcode > Settings > Accounts > your Apple ID > Team (10 characters).
+DEVELOPMENT_TEAM = ABCDE12345
+
+// Bundle ids are unique per Apple account; add something of your own if the default is taken.
+SEASON_BUNDLE_ID = local.season.phone.yourname
+
+// Your Mac's address, prefilled on first launch. In .xcconfig files "//" starts a comment,
+// so write the scheme as https:/$()/ :
+SEASON_SERVER_URL = https:/$()/your-mac.your-tailnet.ts.net

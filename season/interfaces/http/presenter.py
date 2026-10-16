@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+from season.application.sync import SyncResult
 from season.domain.model import Board, Category, SessionMark, Task, Week
 
 
@@ -18,6 +19,10 @@ class Undo:
 class Reply:
     notice: str | None = None
     undo: Undo | None = None
+    sync: SyncResult | None = None
+
+
+UPCOMING = 60
 
 
 def mark_json(m: SessionMark) -> dict:
@@ -60,12 +65,17 @@ def board_json(board: Board, reply: Reply | None = None) -> dict:
         "pages": board.pages,
         "pages_target": board.pages_target,
         "problem": None if current is None else {"number": current.number, "title": current.title},
+        # the next problems too, so an offline phone can advance the list itself
+        "upcoming": [{"number": p.number, "title": p.title}
+                     for p in board.problems.problems[board.problems.position:board.problems.position + UPCOMING]],
         "categories": [_category(c) for c in board.categories],
         "events": events,
         "weeks": [_week(w) for w in board.weeks],
     }
     if reply and reply.notice:
         out["notice"] = reply.notice
+    if reply and reply.sync is not None:
+        out["sync"] = {"results": [{"id": r.id, "ok": r.ok, "error": r.error} for r in reply.sync.results]}
     if reply and reply.undo:
         out["undo"] = {"task_id": reply.undo.task_id, "slot": reply.undo.slot, **mark_json(reply.undo.mark)}
     return out

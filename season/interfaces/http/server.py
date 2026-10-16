@@ -14,6 +14,7 @@
     POST   /api/categories                     {label, description, task_id?}
     PUT    /api/pages                          {pages}
     POST   /api/problems/skip
+    POST   /api/sync                           {ops: [...]}  changes queued on the phone; see application/sync.py
 
 Writes need the header `X-Requested-With: season` and, when the browser
 sends one, an Origin of this server. Other websites can't forge either.
@@ -32,6 +33,7 @@ from season.domain.errors import InvalidInput, NotFound
 from season.domain.model import SessionMark
 
 from .presenter import Reply, Undo, board_json
+from .sync_json import parse_ops
 
 WEB = Path(__file__).resolve().parent / "web"
 # Files the board page needs besides itself (Home Screen icon, app manifest). Fixed list, no path lookups.
@@ -41,7 +43,7 @@ STATIC = {
     "/icon-192.png": ("icon-192.png", "image/png"),
     "/icon-512.png": ("icon-512.png", "image/png"),
 }
-MAX_BODY = 16 * 1024
+MAX_BODY = 512 * 1024      # a phone's offline queue can be a few hundred changes
 
 Handler = Callable[[App, re.Match, dict], Reply | None]
 
@@ -127,7 +129,12 @@ def _create_category(app: App, m: re.Match, b: dict) -> Reply | None:
     return None
 
 
+def _sync(app: App, m: re.Match, b: dict) -> Reply:
+    return Reply(sync=app.apply_sync(parse_ops(b)))
+
+
 ROUTES: list[tuple[str, re.Pattern, Handler]] = [
+    ("POST", re.compile(r"/api/sync"), _sync),
     ("POST", re.compile(r"/api/tasks/(\d+)/slots/(\d+)"),
      lambda app, m, b: app.mark_session(int(m[1]), int(m[2]))),
     ("DELETE", re.compile(r"/api/tasks/(\d+)/slots/(\d+)"), _unmark),

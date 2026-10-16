@@ -60,6 +60,22 @@ Without the installers, `uv run serve.py` starts the server and the board is at 
 
 The board then opens full screen from its own icon. The Mac has to be on; the data stays on the Mac.
 
+**iPhone app** (native, works offline)
+
+The `ios/` folder is a SwiftUI app that keeps its own copy of the board, works without a connection, and
+syncs with the Mac's server over Tailscale whenever it can reach it (`POST /api/sync`: the phone's queued
+changes are applied once each, in order, and the Mac's board comes back). Needs Xcode and
+`brew install xcodegen`:
+
+```sh
+cd ios
+cp Config/Local.example.xcconfig Config/Local.xcconfig   # your Apple team id and Mac address
+xcodegen                                                  # writes Season.xcodeproj
+open Season.xcodeproj                                     # pick your iPhone, press Run
+```
+
+With a free Apple ID the app has to be reinstalled from the Mac every 7 days.
+
 The plan (weeks, events, types, the numbered problem queue) is plain data in `plan.py`. **It is yours and
 git-ignored** — `plan.example.py` is the generic starting point, and `plan.py` is what the board actually
 reads. Edit it any time and re-run `uv run seed.py`; ticks, notes, added tasks and manually chosen types

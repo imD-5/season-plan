@@ -28,6 +28,14 @@ jobs:
           uv run seed.py
           uv run python -m season.interfaces.cli.remind --quiet
 
+  ios-core:
+    name: iPhone app core (swift test)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test
+        working-directory: ios/SeasonCore
+
   lint:
     runs-on: ubuntu-latest
     steps:

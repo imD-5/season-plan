@@ -21,6 +21,7 @@ from season.domain.model import (
     SessionMark,
     Task,
     Week,
+    check_client_key,
     check_pages,
     clean_note,
     clean_task_text,
@@ -103,7 +104,8 @@ class MarkSession:
     def __init__(self, uow: UnitOfWorkFactory, clock: Clock) -> None:
         self._uow, self._clock = uow, clock
 
-    def __call__(self, task_id: int, slot: int) -> None:
+    def __call__(self, task_id: int, slot: int, done_on: date | None = None) -> None:
+        """done_on: the day it was done, when that differs from today (a phone syncing later)."""
         with self._uow() as u:
             task = u.tasks.get(task_id)
             task.require_slot(slot)
@@ -115,7 +117,7 @@ class MarkSession:
                 if queue.current:
                     problem = queue.current.number
                     u.problems.save_position(queue.advanced().position)
-            u.tasks.set_mark(task_id, slot, SessionMark(self._clock.today(), problem))
+            u.tasks.set_mark(task_id, slot, SessionMark(done_on or self._clock.today(), problem))
 
 
 class UnmarkSession:
@@ -188,7 +190,7 @@ class AddTask:
         self._uow, self._classifier, self._policy = uow, classifier, policy
 
     def __call__(self, week_start: date, text: str, sessions: int | None = None,
-                 hours_each: float | None = None) -> Task:
+                 hours_each: float | None = None, client_key: str | None = None) -> Task:
         """Size comes from the arguments, else from a trailing "3x2h" in the text, else 1 box of 1h."""
         text, parsed_sessions, parsed_hours = parse_size(clean_task_text(text))
         sessions = sessions if sessions is not None else parsed_sessions
@@ -196,13 +198,18 @@ class AddTask:
         size = {k: v for k, v in (("sessions", sessions), ("hours_each", hours_each)) if v is not None}
         Task.new_user_task(week_start, "check", text, CategoryAssignment(OTHER, AssignedBy.FALLBACK), 0,
                            **size)          # validate before spending a classifier call
+        key = check_client_key(client_key) if client_key else "added-" + uuid.uuid4().hex[:8]
         with self._uow() as u:
             if not u.weeks.exists(week_start):
                 raise NotFound(f"no week starting {week_start}")
+            if client_key and (existing := u.tasks.find_by_key(key)):
+                return existing           # the same phone task, sent again
             categories = u.categories.all()
         assignment = _classify(self._classifier, self._policy, text, categories)
         with self._uow() as u:
-            task = Task.new_user_task(week_start, "added-" + uuid.uuid4().hex[:8], text,
+            if client_key and (existing := u.tasks.find_by_key(key)):
+                return existing
+            task = Task.new_user_task(week_start, key, text,
                                       assignment, u.tasks.next_position(week_start), **size)
             return u.tasks.add(task)
 

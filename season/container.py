@@ -1,12 +1,13 @@
 """Composition root: the only place that knows every layer and wires them."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from season.adapters.jev_classifier import JevClassifier, UnavailableClassifier
 from season.adapters.sqlite_store import SqliteDatabase
 from season.adapters.system import SystemClock, default_notifier
 from season.application import use_cases as uc
 from season.application.ports import Classifier, Clock, Notifier
+from season.application.sync import ApplySync
 from season.config import Settings
 
 
@@ -28,6 +29,7 @@ class App:
     create_category: uc.CreateCategory
     set_pages: uc.SetPages
     seed_plan: uc.SeedPlan
+    apply_sync: ApplySync | None = None
 
 
 def build_app(settings: Settings, *, classifier: Classifier | None = None,
@@ -41,7 +43,7 @@ def build_app(settings: Settings, *, classifier: Classifier | None = None,
                       if settings.typesafe_api_key else UnavailableClassifier())
     policy = uc.ClassificationPolicy(settings.min_probability)
     get_board = uc.GetBoard(uow, clock)
-    return App(
+    app = App(
         settings=settings,
         notifier=notifier or default_notifier(),
         get_board=get_board,
@@ -59,3 +61,4 @@ def build_app(settings: Settings, *, classifier: Classifier | None = None,
         set_pages=uc.SetPages(uow),
         seed_plan=uc.SeedPlan(uow),
     )
+    return replace(app, apply_sync=ApplySync(uow, app))

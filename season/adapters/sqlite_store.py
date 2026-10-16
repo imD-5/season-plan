@@ -25,7 +25,7 @@ from season.domain.model import (
     Week,
 )
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS weeks (
@@ -75,6 +75,11 @@ CREATE TABLE IF NOT EXISTS problems (
   position INTEGER PRIMARY KEY,
   number   INTEGER NOT NULL,
   title    TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS applied_ops (
+  id         TEXT PRIMARY KEY,
+  result     TEXT NOT NULL,
+  applied_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,
@@ -231,6 +236,10 @@ class _Tasks:
         return self._build(self._con.execute(
             "SELECT * FROM tasks WHERE week_start = ? ORDER BY position, id", (start,)).fetchall())
 
+    def find_by_key(self, key: str) -> Task | None:
+        rows = self._con.execute("SELECT * FROM tasks WHERE key = ? ORDER BY id LIMIT 1", (key,)).fetchall()
+        return self._build(rows)[0] if rows else None
+
     def get(self, task_id: int) -> Task:
         rows = self._con.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchall()
         if not rows:
@@ -372,6 +381,18 @@ class _Problems:
                               [(i, p.number, p.title) for i, p in enumerate(problems)])
 
 
+class _AppliedOps:
+    def __init__(self, con: sqlite3.Connection) -> None:
+        self._con = con
+
+    def result(self, op_id: str) -> str | None:
+        row = self._con.execute("SELECT result FROM applied_ops WHERE id = ?", (op_id,)).fetchone()
+        return row["result"] if row else None
+
+    def record(self, op_id: str, result: str) -> None:
+        self._con.execute("INSERT OR IGNORE INTO applied_ops(id, result) VALUES(?, ?)", (op_id, result))
+
+
 class SqliteUnitOfWork:
     def __init__(self, db: SqliteDatabase) -> None:
         self._db = db
@@ -384,6 +405,7 @@ class SqliteUnitOfWork:
         settings = _Settings(con)
         self.settings = settings
         self.tasks = _Tasks(con)
+        self.applied_ops = _AppliedOps(con)
         self.weeks = _Weeks(con, self.tasks)
         self.categories = _Categories(con)
         self.events = _Events(con)

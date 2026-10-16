@@ -112,6 +112,16 @@ def clean_task_text(text: str) -> str:
     return text
 
 
+_CLIENT_KEY = re.compile(r"[a-z0-9-]{8,64}")
+
+
+def check_client_key(ref: str) -> str:
+    """Tasks created on another device carry that device's id, stored as the task key."""
+    if not isinstance(ref, str) or not _CLIENT_KEY.fullmatch(ref):
+        raise InvalidInput("client task id must be 8-64 lowercase letters, digits or dashes")
+    return "phone-" + ref
+
+
 def check_size(sessions: int, hours_each: float) -> tuple[int, float]:
     """Boxes are whole numbers 1-12; hours go in half-hour steps up to 8 (0 = no estimate)."""
     if isinstance(sessions, bool) or not isinstance(sessions, int) or not 1 <= sessions <= MAX_SESSIONS:

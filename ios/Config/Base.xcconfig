@@ -1,0 +1,8 @@
+// Shared build settings. Per-machine values (your Apple team, your Mac's address) go in
+// Local.xcconfig, which is git-ignored. Copy Local.example.xcconfig to start.
+
+SEASON_SERVER_URL =
+SEASON_BUNDLE_ID = local.season.phone
+DEVELOPMENT_TEAM =
+
+#include? "Local.xcconfig"

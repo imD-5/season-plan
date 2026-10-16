@@ -47,3 +47,14 @@ dist/
 .vscode/
 .idea/
 *.swp
+
+# iOS app: generated project, build output, per-machine signing/address
+ios/Season.xcodeproj/
+ios/Season/Info.plist
+ios/Config/Local.xcconfig
+ios/build/
+ios/SeasonCore/.build/
+ios/SeasonCore/.swiftpm/
+*.xcuserstate
+xcuserdata/
+DerivedData/
