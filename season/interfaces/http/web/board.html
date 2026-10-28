@@ -60,10 +60,18 @@
   .tick.on { outline: 1px solid #f3f0e8; outline-offset: 2px; }
 
   .glance { padding-top: 14px; font-size: 13px; color: #9c978c; }
+  /* Pace: the deadline against the boxes already on the board. One line, same words as the reminders. */
+  .pace { padding-top: 10px; font-size: 12px; color: #8a867e; font-variant-numeric: tabular-nums; }
+  .pace.short { color: #e8b64c; }
+  .pace.done { color: #8fb38a; }
 
   .days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; padding-top: 12px; }
   .day { min-height: 78px; padding: 6px 5px; border-top: 1px solid #34312c; }
   .day.past { opacity: 0.7; }
+  /* the day you are logging into: click a day, then tick boxes as usual */
+  .day.tappable { cursor: pointer; }
+  .day.on { opacity: 1; outline: 1px solid #e8b64c; outline-offset: -1px; background: rgba(232, 182, 76, 0.08); }
+  .logging { padding-top: 10px; font-size: 12px; color: #e8b64c; }
   .day.today { border-top: 2px solid #f3f0e8; background: rgba(243,240,232,0.06); opacity: 1; }
   .dn { font-size: 11px; color: #8a867e; padding-bottom: 5px; font-variant-numeric: tabular-nums; }
   .day.today .dn { color: #f3f0e8; font-weight: 600; }
@@ -122,7 +130,7 @@
   .sizer .total { font-size: 11px; color: #6a665e; }
   .add-hint { padding-top: 6px; font-size: 11px; color: #6a665e; }
   /* popups flip above the row when there is no room below */
-  .picker.up, .sizer.up { top: auto; bottom: 36px; }
+  .picker.up, .sizer.up, .editor.up { top: auto; bottom: 36px; }
 
 
   /* type picker */
@@ -142,6 +150,15 @@
   .picker .actions { display: flex; gap: 8px; justify-content: flex-end; }
   .picker .actions button { width: auto; padding: 5px 10px; font-size: 12px; border: 1px solid #3a3731; }
   .picker .actions button[type="submit"] { background: #f3f0e8; color: #121210; border-color: #f3f0e8; }
+
+  /* session editor: the day it was done, and its note */
+  .editor { position: absolute; top: 36px; left: 4px; z-index: 20; width: 236px; padding: 10px 12px;
+            background: #1d1c19; border: 1px solid #3a3731; box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+            cursor: default; display: grid; gap: 9px; }
+  .editor .field { display: grid; gap: 4px; font-size: 11px; color: #8a867e; }
+  .editor input { background: #121210; border: 1px solid #3a3731; color: #f3f0e8; font-size: 13px;
+                  padding: 5px 7px; color-scheme: dark; }
+  .editor .hint { font-size: 11px; color: #6a665e; }
 
   .add { display: block; width: calc(100% + 20px); margin: 4px -10px 0; min-height: 40px; background: none;
          border: 0; padding: 0 10px; color: #6a665e; font-size: 13px; text-align: left;
@@ -208,7 +225,7 @@
     .add { margin: 4px -14px 0; width: calc(100% + 28px); padding: 0 14px; min-height: 48px; }
 
     /* iOS zooms into any text field under 16px on focus */
-    .add-input, .note-input, .pages-input, .picker input { font-size: 16px; }
+    .add-input, .note-input, .pages-input, .picker input, .editor input { font-size: 16px; }
   }
 
   /* hover effects only where a mouse can hover: on iPhone a :hover style makes the first tap
@@ -253,6 +270,8 @@
   var editingPages = false;
   var pickerFor = null;      // task id whose type picker is open
   var sizeFor = null;        // task id whose box/hours control is open
+  var editFor = null;        // {task, slot} whose day/note editor is open
+  var logDay = null;         // the day boxes are being ticked into (null = today)
   var newTypeFor = null;     // task id the "new type" form is for
   var status = { text: "", error: false };
   var noteEdit = null;       // {task, slot, draft} whose note field is open
@@ -286,14 +305,14 @@
   function setStatus(text, isError) { status = { text: text, error: !!isError }; render(); }
   function slotPath(id, slot) { return "/api/tasks/" + id + "/slots/" + slot; }
 
-  // tick → just tick; a note is optional and added by right-clicking the box
+  // tick → tick on the chosen day (or today); the day can still be changed by right-clicking the box
   function check(t, slot) {
-    noteEdit = null;
-    write("POST", slotPath(t.id, slot));
+    noteEdit = null; editFor = null;
+    write("POST", slotPath(t.id, slot), logDay ? { d: logDay } : undefined);
   }
   // untick → offer Undo, which brings back the date, problem and note
   function uncheck(t, slot) {
-    noteEdit = null;
+    noteEdit = null; editFor = null;
     write("DELETE", slotPath(t.id, slot)).then(function (b) {
       if (!b || !b.undo) return;
       var u = b.undo;
@@ -390,8 +409,8 @@
     });
     return node;
   }
-  function closePicker() { pickerFor = null; newTypeFor = null; sizeFor = null; }
-  function anyPopup() { return pickerFor !== null || sizeFor !== null; }
+  function closePicker() { pickerFor = null; newTypeFor = null; sizeFor = null; editFor = null; }
+  function anyPopup() { return pickerFor !== null || sizeFor !== null || editFor !== null; }
 
   // ── render ─────────────────────────────────────────────────────────────
   function render() {
@@ -429,6 +448,12 @@
     head.appendChild(meta);
     root.appendChild(head);
 
+    if (S.pace) {
+      var pc = el("p", "pace " + S.pace.status, S.pace.line);
+      pc.title = "Deadline " + S.pace.deadline + " · " + S.pace.days_left + " days left";
+      root.appendChild(pc);
+    }
+
     // season
     var season = el("div", "season"), group = null, month = "";
     S.weeks.forEach(function (w, i) {
@@ -450,21 +475,15 @@
 
     if (week.glance) root.appendChild(el("p", "glance", week.glance));
 
-    // day strip
+    // day strip — click a day, then tick boxes: they land on that day instead of today
     var days = el("div", "days");
-    for (var i = 0; i < 7; i++) {
-      var date = addDays(week.start, i), cell = el("div", "day");
-      if (date === today) cell.classList.add("today"); else if (date < today) cell.classList.add("past");
-      cell.appendChild(el("div", "dn", DOW[i] + " " + Number(date.slice(8))));
-      (S.events[date] || []).forEach(function (e) { var n = el("div", "ev " + (e.k || ""), e.t); n.title = e.t; cell.appendChild(n); });
-      didOn(date).forEach(function (t) {
-        var base = t.replace(/ \u00d7\d+$/, ""), n = el("div", "did", t);
-        n.title = notesOn[base] ? t + "\n" + notesOn[base] : t;
-        cell.appendChild(n);
-      });
-      days.appendChild(cell);
-    }
+    for (var i = 0; i < 7; i++) days.appendChild(dayCell(addDays(week.start, i), today));
     root.appendChild(days);
+
+    if (logDay) {
+      root.appendChild(el("p", "logging", "Logging into " + dow(logDay) + " " + Number(logDay.slice(8)) +
+        " \u2014 tick the boxes that were done that day. Click the day again to stop."));
+    }
 
     // menu of the week
     root.appendChild(el("p", "menu-label", "THIS WEEK \u2014 PICK ANY"));
@@ -536,11 +555,12 @@
       var b = button("box", null, function () { if (e) uncheck(t, i); else check(t, i); });
       b.setAttribute("aria-pressed", e ? "true" : "false");
       b.title = e ? "Done " + dow(e.d) + " " + Number(e.d.slice(8)) + (e.problem ? " \u00b7 " + e.problem : "")
-                    + (e.note ? "\n" + e.note : "") + "\nClick to uncheck \u00b7 right-click for a note" : "Mark one session done";
+                    + (e.note ? "\n" + e.note : "") + "\nClick to uncheck \u00b7 right-click to change the day or note"
+                  : "Mark one session done";
       if (e) b.addEventListener("contextmenu", function (ev) {
         ev.preventDefault(); ev.stopPropagation();
-        closePicker(); sizeFor = null;
-        noteEdit = { task: t.id, slot: i }; render();
+        closePicker();
+        editFor = { task: t.id, slot: i }; render();
       });
       boxes.appendChild(b);
     });
@@ -554,7 +574,8 @@
     time.title = "Change boxes and hours";
     li.appendChild(time);
 
-    li.addEventListener("click", function () {
+    li.addEventListener("click", function (ev) {
+      ev.stopPropagation();               // keep the chosen day, so the next box lands on it too
       if (anyPopup()) { closePicker(); render(); return; }
       var next = t.slots.indexOf(null);
       if (next >= 0) check(t, next); else uncheck(t, t.slots.length - 1);
@@ -564,6 +585,7 @@
     if (notes) li.appendChild(notes);
     if (pickerFor === t.id) li.appendChild(placePopup(picker(t)));
     if (sizeFor === t.id) li.appendChild(placePopup(sizer(t)));
+    if (editFor && editFor.task === t.id) li.appendChild(placePopup(sessionEditor(t, editFor.slot)));
     return li;
   }
 
@@ -613,6 +635,34 @@
     return inp;
   }
 
+  // One cell of the day strip. Clicking it points the boxes at that day.
+  function dayCell(date, today) {
+    var cell = el("div", "day");
+    if (date === today) cell.classList.add("today"); else if (date < today) cell.classList.add("past");
+    if (date === logDay) cell.classList.add("on");
+    cell.appendChild(el("div", "dn", dow(date) + " " + Number(date.slice(8))));
+    (S.events[date] || []).forEach(function (e) {
+      var n = el("div", "ev " + (e.k || ""), e.t); n.title = e.t; cell.appendChild(n);
+    });
+    didOn(date).forEach(function (t) {
+      var base = t.replace(/ \u00d7\d+$/, ""), n = el("div", "did", t);
+      n.title = notesOn[base] ? t + "\n" + notesOn[base] : t;
+      cell.appendChild(n);
+    });
+    if (date <= today) {
+      cell.classList.add("tappable");
+      cell.title = date === logDay ? "Logging here. Click to stop." : "Log work on this day";
+      cell.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        var same = logDay === date;
+        closePicker();
+        logDay = same ? null : date;
+        render();
+      });
+    }
+    return cell;
+  }
+
   // boxes and hours per box; every click saves
   function sizer(t) {
     var box = el("div", "sizer");
@@ -637,6 +687,62 @@
     box.appendChild(line("Hours each", h ? hoursText(h) : "\u2014", h > 0, h < 8,
       function () { save(n, Math.max(0, h - 0.5)); }, function () { save(n, Math.min(8, h + 0.5)); }));
     box.appendChild(el("div", "total", h ? "About " + (n * h) + "h this week" : "No time estimate"));
+    return box;
+  }
+
+  // A checked box's editor: the day it was done, and its note. Right-click / long-press opens it.
+  function sessionEditor(t, slot) {
+    var e = t.slots[slot], box = el("div", "editor");
+    box.addEventListener("click", function (ev) { ev.stopPropagation(); });
+
+    var dayField = el("label", "field");
+    dayField.appendChild(el("span", null, "Done on"));
+    var d = el("input");
+    d.type = "date"; d.value = e.d;
+    d.min = S.weeks[weekIndex].start; d.max = todayISO();
+    d.setAttribute("aria-label", "The day this was done");
+    d.addEventListener("change", function () {
+      var v = d.value;
+      if (!v || v === e.d) return;
+      editFor = null;                      // the popup closes; the strip shows the new day
+      write("PUT", slotPath(t.id, slot) + "/date", { d: v }).then(function (b) {
+        if (!b || !b.undo) { render(); return; }
+        var back = b.undo.d;
+        undo = { label: "Done " + dow(v) + " " + Number(v.slice(8)) + " instead.", run: function () {
+          write("PUT", slotPath(t.id, slot) + "/date", { d: back });
+        } };
+        render();
+      });
+    });
+    dayField.appendChild(d);
+    box.appendChild(dayField);
+
+    var noteField = el("label", "field");
+    noteField.appendChild(el("span", null, "Note"));
+    var note = el("input", "note-input");
+    note.value = e.note || ""; note.maxLength = 500; note.placeholder = "Optional";
+    note.setAttribute("aria-label", "Note for this session");
+    var touched = false, finished = false;
+    function finish(save) {
+      if (finished) return;
+      finished = true;
+      editFor = null;
+      var after = note.value.trim() || null;
+      if (save && after !== (e.note || null)) saveNote(t, slot, note.value); else render();
+    }
+    note.addEventListener("input", function () { touched = true; });
+    note.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter") { ev.preventDefault(); finish(true); }
+      if (ev.key === "Escape") { ev.stopPropagation(); finish(false); }
+    });
+    note.addEventListener("blur", function (ev) {
+      if (redrawing || !touched) return;
+      if (ev.relatedTarget && box.contains(ev.relatedTarget)) return;   // moving to the day field
+      finish(true);
+    });
+    noteField.appendChild(note);
+    box.appendChild(noteField);
+    box.appendChild(el("p", "hint", "Enter saves the note. The day saves as soon as you pick it."));
     return box;
   }
 
@@ -683,7 +789,10 @@
   }
 
   // close the picker on outside click / Escape
-  document.addEventListener("click", function () { if (anyPopup()) { closePicker(); render(); } });
+  document.addEventListener("click", function () {
+    if (logDay) { logDay = null; render(); }
+    if (anyPopup()) { closePicker(); render(); }
+  });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && anyPopup()) { closePicker(); render(); } });
   // refresh when coming back to the window (new day, edits made elsewhere)
   document.addEventListener("visibilitychange", function () { if (!document.hidden) load(); });

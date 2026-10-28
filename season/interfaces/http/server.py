@@ -6,6 +6,7 @@
     DELETE /api/tasks/{id}/slots/{slot}        uncheck it; the reply carries `undo`
     POST   /api/tasks/{id}/slots/{slot}/restore {d, problem, note}  undo an uncheck
     PUT    /api/tasks/{id}/slots/{slot}/note   {note}        add/change/clear (null or "") the note
+    PUT    /api/tasks/{id}/slots/{slot}/date   {d}           say which day it was done; reply carries `undo`
     POST   /api/tasks                          {week, text, sessions?, hours?}  add; Jev picks the type
                                                ("Read papers 3x2h" in text also sets the size)
     PUT    /api/tasks/{id}/size                {sessions, hours}  boxes and hours per box
@@ -103,6 +104,11 @@ def _add_task(app: App, m: re.Match, b: dict) -> Reply | None:
     return None
 
 
+def _mark(app: App, m: re.Match, b: dict) -> None:
+    """Tick a box. `d` dates it to another day of that week instead of today."""
+    app.mark_session(int(m[1]), int(m[2]), _date(b, "d") if b.get("d") else None)
+
+
 def _unmark(app: App, m: re.Match, b: dict) -> Reply | None:
     task_id, slot = int(m[1]), int(m[2])
     removed = app.unmark_session(task_id, slot)
@@ -116,6 +122,12 @@ def _restore(app: App, m: re.Match, b: dict) -> None:
 
 def _note(app: App, m: re.Match, b: dict) -> None:
     app.set_session_note(int(m[1]), int(m[2]), _optional_str(b, "note"))
+
+
+def _set_date(app: App, m: re.Match, b: dict) -> Reply:
+    task_id, slot = int(m[1]), int(m[2])
+    previous = app.set_session_date(task_id, slot, _date(b, "d"))
+    return Reply(undo=Undo(task_id, slot, SessionMark(previous)))
 
 
 def _create_category(app: App, m: re.Match, b: dict) -> Reply | None:
@@ -135,11 +147,11 @@ def _sync(app: App, m: re.Match, b: dict) -> Reply:
 
 ROUTES: list[tuple[str, re.Pattern, Handler]] = [
     ("POST", re.compile(r"/api/sync"), _sync),
-    ("POST", re.compile(r"/api/tasks/(\d+)/slots/(\d+)"),
-     lambda app, m, b: app.mark_session(int(m[1]), int(m[2]))),
+    ("POST", re.compile(r"/api/tasks/(\d+)/slots/(\d+)"), _mark),
     ("DELETE", re.compile(r"/api/tasks/(\d+)/slots/(\d+)"), _unmark),
     ("POST", re.compile(r"/api/tasks/(\d+)/slots/(\d+)/restore"), _restore),
     ("PUT", re.compile(r"/api/tasks/(\d+)/slots/(\d+)/note"), _note),
+    ("PUT", re.compile(r"/api/tasks/(\d+)/slots/(\d+)/date"), _set_date),
     ("POST", re.compile(r"/api/tasks"), _add_task),
     ("DELETE", re.compile(r"/api/tasks/(\d+)"),
      lambda app, m, b: app.remove_task(int(m[1]))),

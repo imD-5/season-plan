@@ -111,6 +111,18 @@ func sample() throws -> Board { try Board.decoder().decode(Board.self, from: Dat
         #expect(Board.tempID(for: "abcd1234") == Board.tempID(for: "abcd1234"))
     }
 
+    @Test func dayChangeKeepsTheNoteAndStaysInTheWeek() throws {
+        var b = try sample()                                  // today 2026-10-14, week 12–18 Oct
+        b.apply(.date(.id(1), 0, on: "2026-10-13"))
+        #expect(b.weeks[0].tasks[0].slots[0]?.d == "2026-10-13")
+        #expect(b.weeks[0].tasks[0].slots[0]?.note == "intro")
+        b.apply(.date(.id(1), 1, on: "2026-10-14"))           // that box is empty: ignored
+        #expect(b.weeks[0].tasks[0].slots[1] == nil)
+        b.apply(.date(.id(1), 0, on: "2026-10-19"))           // next week: ignored
+        b.apply(.date(.id(1), 0, on: "2026-10-15"))           // tomorrow: ignored
+        #expect(b.weeks[0].tasks[0].slots[0]?.d == "2026-10-13")
+    }
+
     @Test func categories() throws {
         var b = try sample()
         b.apply(.newCategory(label: "Side Quest!", description: "Fun", task: .id(1)))
@@ -129,6 +141,9 @@ func sample() throws -> Board { try Board.decoder().decode(Board.self, from: Dat
         let nc = try JSONSerialization.jsonObject(with: Board.encoder().encode(
             Op.newCategory(label: "a", description: "b", task: .client("k1234567")))) as! [String: Any]
         #expect(nc["kind"] as? String == "new_category" && nc["task"] as? String == "k1234567")
+        let day = try JSONSerialization.jsonObject(with: Board.encoder().encode(
+            Op.date(.id(1), 0, on: "2026-10-13"))) as! [String: Any]
+        #expect(day["kind"] as? String == "date" && day["d"] as? String == "2026-10-13" && day["slot"] as? Int == 0)
     }
 }
 

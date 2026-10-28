@@ -38,6 +38,8 @@ def utf8_stdout() -> None:
 
 def summary(status: WeekStatus) -> str:
     lines = [f"Week of {status.week.start} ({status.week.label}). Pages: {status.pages}."]
+    if status.pace is not None:
+        lines.append(f"Pace: {status.pace.line()}")
     for t in status.week.tasks:
         done = sum(1 for s in t.slots if s)
         days = sorted({s.done_on.isoformat() for s in t.slots if s})

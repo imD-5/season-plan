@@ -4,6 +4,7 @@ import SwiftUI
 /// What a sheet is open for.
 enum Sheet: Identifiable {
     case note(ref: TaskRef, slot: Int, title: String, old: String?, justTicked: Bool)
+    case day(ref: TaskRef, slot: Int, title: String, old: String)
     case size(BoardTask)
     case newType(TaskRef?)
     case pages
@@ -12,6 +13,7 @@ enum Sheet: Identifiable {
     var id: String {
         switch self {
         case .note(let r, let s, _, _, _): return "note-\(r)-\(s)"
+        case .day(let r, let s, _, _): return "day-\(r)-\(s)"
         case .size(let t): return "size-\(t.key)"
         case .newType: return "type"
         case .pages: return "pages"

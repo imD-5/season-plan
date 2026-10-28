@@ -37,6 +37,20 @@ class SyncTest(unittest.TestCase):
         mark = task(self.app, 0, "thesis").slots[0]
         self.assertEqual((mark.done_on, mark.note), (date(2026, 10, 13), "on the train"))
 
+    def test_offline_day_change_stays_in_the_week(self):
+        thesis = task(self.app, 0, "thesis").id
+        self.app.apply_sync([self.op(s.Mark, thesis, 0, date(2026, 10, 14))])
+        self.app.set_session_note(thesis, 0, "kept")
+        result = self.app.apply_sync([self.op(s.SetDate, thesis, 0, date(2026, 10, 13))])
+        self.assertTrue(result.results[0].ok, result.failed)
+        mark = task(self.app, 0, "thesis").slots[0]
+        self.assertEqual((mark.done_on, mark.note), (date(2026, 10, 13), "kept"))
+        # clock is Friday 16 Oct, week ends on the 18th
+        refused = self.app.apply_sync([self.op(s.SetDate, thesis, 0, date(2026, 10, 19))])
+        self.assertFalse(refused.results[0].ok)
+        self.assertTrue(refused.results[0].error)
+        self.assertEqual(task(self.app, 0, "thesis").slots[0].done_on, date(2026, 10, 13))
+
     def test_phone_task_is_classified_and_later_ops_find_it(self):
         result = self.app.apply_sync([
             self.op(s.Add, "a1b2c3d4-0001", MONDAY, "Read papers 3x2h"),
@@ -113,9 +127,11 @@ class SyncJsonTest(unittest.TestCase):
             {"id": "op-00000002", "kind": "add", "client_key": "abcd1234", "week": "2026-10-12", "text": "x",
              "sessions": 2, "hours": 1},
             {"id": "op-00000003", "kind": "pages", "pages": None},
+            {"id": "op-00000004", "kind": "date", "task": 3, "slot": 0, "d": "2026-10-12"},
         ]})
-        self.assertEqual([type(o).__name__ for o in ops], ["Mark", "Add", "SetPages"])
+        self.assertEqual([type(o).__name__ for o in ops], ["Mark", "Add", "SetPages", "SetDate"])
         self.assertEqual(ops[1].hours, 1.0)
+        self.assertEqual(ops[3].done_on, date(2026, 10, 12))
         for bad in ([{"id": "short", "kind": "skip"}], [{"id": "op-00000001", "kind": "explode"}],
                     [{"id": "op-00000001", "kind": "mark", "task": True, "slot": 0, "d": "2026-10-13"}],
                     [{"id": "op-00000001", "kind": "mark", "task": 1, "slot": 0, "d": "Tuesday"}], "nope"):

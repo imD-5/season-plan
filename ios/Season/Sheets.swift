@@ -11,6 +11,8 @@ struct SheetView: View {
             switch sheet {
             case .note(let ref, let slot, let title, let old, let justTicked):
                 NoteSheet(ref: ref, slot: slot, title: title, old: old, justTicked: justTicked)
+            case .day(let ref, let slot, let title, let old):
+                DaySheet(ref: ref, slot: slot, title: title, old: old)
             case .size(let task): SizeSheet(task: task)
             case .newType(let ref): NewTypeSheet(ref: ref)
             case .pages: PagesSheet()
@@ -85,6 +87,49 @@ struct NoteSheet: View {
                                       op: .note(ref, slot, old)))
         }
         dismiss()
+    }
+}
+
+// MARK: day
+
+struct DaySheet: View {
+    @Environment(Store.self) private var store
+    @Environment(\.dismiss) private var dismiss
+    let ref: TaskRef, slot: Int, title: String, old: String
+    @State private var day = Date()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            SheetTitle(text: title)
+            Text("Done on").font(.caption).foregroundStyle(Theme.faint)
+            DatePicker("", selection: $day, in: bounds(), displayedComponents: .date)
+                .datePickerStyle(.compact).labelsHidden()
+                .accessibilityIdentifier("day-picker")
+            Text("Only days in this week, up to today.").font(.caption).foregroundStyle(Theme.faint)
+            PrimaryButton(title: "Save") {
+                let picked = Day.string(day)
+                if picked != old {
+                    let label = "Done \(Day.weekday(picked)) \(Int(picked.suffix(2)) ?? 0) instead."
+                    store.perform(.date(ref, slot, on: picked),
+                                  undo: .init(label: label, op: .date(ref, slot, on: old)))
+                }
+                dismiss()
+            }
+            .accessibilityIdentifier("day-save")
+        }
+        .onAppear { day = Day.date(old) ?? Date() }
+    }
+
+    /// The session's own week, ending today: the server refuses anything else.
+    private func bounds() -> ClosedRange<Date> {
+        guard let board = store.board, let loc = board.locate(ref) else {
+            let d = Day.date(old) ?? Date()
+            return d...d
+        }
+        let week = board.weeks[loc.week]
+        let last = min(week.end, board.today)
+        let from = Day.date(week.start) ?? Date()
+        return from...max(from, Day.date(last) ?? from)
     }
 }
 

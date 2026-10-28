@@ -22,11 +22,14 @@ from season.domain.model import (
     Task,
     Week,
     check_client_key,
+    check_done_on,
+    check_in_week,
     check_pages,
     clean_note,
     clean_task_text,
     parse_size,
 )
+from season.domain.pace import Pace, pace_for
 
 from .plan import Plan
 from .ports import Classifier, ClassifierUnavailable, Clock, Prediction, UnitOfWorkFactory
@@ -69,6 +72,7 @@ class GetBoard:
                 categories=tuple(u.categories.all()),
                 problems=u.problems.queue(),
                 pages=u.settings.pages(),
+                pages_history=tuple(u.settings.pages_history()),
             )
 
 
@@ -79,6 +83,7 @@ class WeekStatus:
     today_events: tuple[Event, ...]
     done_by_category: dict[str, int]
     pages: int | None
+    pace: Pace | None = None
 
 
 class GetWeekStatus:
@@ -94,7 +99,7 @@ class GetWeekStatus:
         for t in week.tasks:
             done[t.category] = done.get(t.category, 0) + sum(1 for s in t.slots if s)
         return WeekStatus(board.today, week, tuple(e for e in board.events if e.day == board.today),
-                          done, board.pages)
+                          done, board.pages, pace_for(board))
 
 
 # ── sessions ───────────────────────────────────────────────────────────────
@@ -105,19 +110,21 @@ class MarkSession:
         self._uow, self._clock = uow, clock
 
     def __call__(self, task_id: int, slot: int, done_on: date | None = None) -> None:
-        """done_on: the day it was done, when that differs from today (a phone syncing later)."""
+        """done_on: the day it was done, when that differs from today (a day picked on the board)."""
         with self._uow() as u:
             task = u.tasks.get(task_id)
             task.require_slot(slot)
             if task.marks.get(slot):
                 return
+            today = self._clock.today()
+            day = check_in_week(done_on, task.week_start) if done_on else today
             problem = None
             if task.tracks_problem_list:
                 queue = u.problems.queue()
                 if queue.current:
                     problem = queue.current.number
                     u.problems.save_position(queue.advanced().position)
-            u.tasks.set_mark(task_id, slot, SessionMark(done_on or self._clock.today(), problem))
+            u.tasks.set_mark(task_id, slot, SessionMark(day, problem))
 
 
 class UnmarkSession:
@@ -171,6 +178,25 @@ class SetSessionNote:
             if task.marks.get(slot) is None:
                 raise InvalidInput("check the box before adding a note")
             u.tasks.set_note(task_id, slot, note)
+
+
+class SetSessionDate:
+    """Change the day a checked session was done. Returns the old day so the caller can offer Undo."""
+
+    def __init__(self, uow: UnitOfWorkFactory, clock: Clock) -> None:
+        self._uow, self._clock = uow, clock
+
+    def __call__(self, task_id: int, slot: int, done_on: date) -> date:
+        with self._uow() as u:
+            task = u.tasks.get(task_id)
+            task.require_slot(slot)
+            mark = task.marks.get(slot)
+            if mark is None:
+                raise InvalidInput("check the box before changing the day")
+            day = check_done_on(done_on, task.week_start, self._clock.today())
+            if day != mark.done_on:
+                u.tasks.set_done_on(task_id, slot, day)
+            return mark.done_on
 
 
 class SkipProblem:
@@ -292,13 +318,13 @@ class CreateCategory:
 
 # ── settings ───────────────────────────────────────────────────────────────
 class SetPages:
-    def __init__(self, uow: UnitOfWorkFactory) -> None:
-        self._uow = uow
+    def __init__(self, uow: UnitOfWorkFactory, clock: Clock) -> None:
+        self._uow, self._clock = uow, clock
 
     def __call__(self, pages: int | None) -> None:
         pages = check_pages(pages)
         with self._uow() as u:
-            u.settings.set_pages(pages)
+            u.settings.set_pages(pages, self._clock.today())
 
 
 # ── seeding ────────────────────────────────────────────────────────────────

@@ -99,6 +99,46 @@ class NoteTest(unittest.TestCase):
             self.app.restore_session(self.tid, 0, removed)
 
 
+class DateTest(unittest.TestCase):
+    """Changing the day a checked session was done."""
+
+    def setUp(self):
+        self.clock = FixedClock(date(2026, 10, 14))      # Wednesday of the first week
+        self.app, self.tmp = make_app(clock=self.clock)
+        self.tid = task(self.app, 0, "thesis").id
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def mark(self):
+        return task(self.app, 0, "thesis").slots[0]
+
+    def test_move_to_another_day_of_the_same_week(self):
+        self.app.mark_session(self.tid, 0)
+        self.assertEqual(self.app.set_session_date(self.tid, 0, date(2026, 10, 13)), date(2026, 10, 14))
+        self.assertEqual(self.mark().done_on, date(2026, 10, 13))
+
+    def test_note_and_problem_stay_when_the_day_moves(self):
+        self.app.mark_session(self.tid, 0)
+        self.app.set_session_note(self.tid, 0, "fixed fig 3")
+        self.app.set_session_date(self.tid, 0, date(2026, 10, 12))
+        self.assertEqual((self.mark().done_on, self.mark().note), (date(2026, 10, 12), "fixed fig 3"))
+
+    def test_day_must_stay_in_the_week_and_out_of_the_future(self):
+        self.app.mark_session(self.tid, 0)
+        with self.assertRaises(InvalidInput):
+            self.app.set_session_date(self.tid, 0, date(2026, 10, 11))   # Sunday before
+        with self.assertRaises(InvalidInput):
+            self.app.set_session_date(self.tid, 0, date(2026, 10, 19))   # next week
+        with self.assertRaises(InvalidInput):
+            self.app.set_session_date(self.tid, 0, date(2026, 10, 15))   # tomorrow
+        self.assertEqual(self.mark().done_on, date(2026, 10, 14))
+
+    def test_needs_a_checked_box(self):
+        with self.assertRaises(InvalidInput):
+            self.app.set_session_date(self.tid, 0, date(2026, 10, 13))
+
+
 class AddTaskTest(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()

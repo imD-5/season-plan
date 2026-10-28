@@ -88,8 +88,11 @@ struct TaskRow: View {
                 }
                 .padding(-4)
                 .contextMenu {
-                    // a note is optional: long-press a checked box to add or edit it
+                    // long-press a checked box: change the day it was done, or add a note
                     if let s = slot {
+                        Button("Change day…", systemImage: "calendar") {
+                            sheet = .day(ref: task.ref, slot: i, title: title, old: s.d)
+                        }
                         Button(s.note == nil ? "Add note" : "Edit note", systemImage: "square.and.pencil") {
                             sheet = .note(ref: task.ref, slot: i, title: title, old: s.note, justTicked: false)
                         }

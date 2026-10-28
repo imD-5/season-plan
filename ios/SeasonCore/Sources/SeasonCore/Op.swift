@@ -4,7 +4,7 @@ import Foundation
 /// Encodes to exactly what POST /api/sync expects (see season/interfaces/http/sync_json.py).
 public struct Op: Codable, Equatable, Sendable, Identifiable {
     public enum Kind: String, Codable, Sendable {
-        case mark, unmark, restore, note, add, remove, resize, category
+        case mark, unmark, restore, note, date, add, remove, resize, category
         case newCategory = "new_category"
         case pages, skip
     }
@@ -43,6 +43,9 @@ public struct Op: Codable, Equatable, Sendable, Identifiable {
     }
     public static func note(_ t: TaskRef, _ slot: Int, _ note: String?) -> Op {
         var o = Op(.note); o.task = t; o.slot = slot; o.note = note; return o
+    }
+    public static func date(_ t: TaskRef, _ slot: Int, on day: String) -> Op {
+        var o = Op(.date); o.task = t; o.slot = slot; o.d = day; return o
     }
     public static func add(week: String, text: String, sessions: Int?, hours: Double?,
                            clientKey: String = UUID().uuidString.lowercased()) -> Op {

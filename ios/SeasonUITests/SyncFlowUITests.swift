@@ -31,6 +31,16 @@ final class SyncFlowUITests: XCTestCase {
         XCTAssertEqual(box.value as? String, "done")
         snapshot(app, "2-ticked")
 
+        // long-press a checked box again: the day it was done opens in its own sheet
+        box.press(forDuration: 1.0)
+        app.buttons["Change day…"].tap()
+        let save = app.buttons["day-save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5), "no day sheet")
+        snapshot(app, "2b-day-sheet")
+        save.tap()
+        XCTAssertFalse(save.waitForExistence(timeout: 2), "day sheet did not close")
+        XCTAssertEqual(box.value as? String, "done")
+
         // untick -> one tap on Undo restores it
         box.tap()
         XCTAssertEqual(box.value as? String, "open")

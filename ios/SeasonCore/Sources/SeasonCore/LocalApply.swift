@@ -36,6 +36,13 @@ extension Board {
                   slot < weeks[w].tasks[t].slots.count, weeks[w].tasks[t].slots[slot] != nil else { return }
             weeks[w].tasks[t].slots[slot]?.note = Board.cleanNote(op.note)
 
+        case .date:
+            // the day has to stay inside the session's own week and not run into the future
+            guard let r = op.task, let slot = op.slot, let day = op.d, let (w, t) = locate(r),
+                  slot < weeks[w].tasks[t].slots.count, weeks[w].tasks[t].slots[slot] != nil,
+                  day >= weeks[w].start, day <= min(weeks[w].end, today) else { return }
+            weeks[w].tasks[t].slots[slot]?.d = day
+
         case .add:
             guard let start = op.week, let key = op.clientKey, let raw = op.text,
                   let w = weeks.firstIndex(where: { $0.start == start }) else { return }

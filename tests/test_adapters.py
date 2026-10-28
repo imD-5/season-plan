@@ -2,6 +2,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
 
 import httpx2
@@ -146,16 +147,42 @@ class SqliteMigrationTest(unittest.TestCase):
                 t = u.weeks.all()[0].tasks[0]
                 self.assertEqual((t.sessions, t.hours_each), (4, 1.5))
 
+    def test_pages_history_keeps_one_row_per_day(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = SqliteDatabase(Path(tmp) / "x.db")
+            db.migrate()
+            with db.unit_of_work() as u:
+                u.settings.set_pages(12, date(2026, 10, 20))
+                u.settings.set_pages(14, date(2026, 10, 22))
+                u.settings.set_pages(15, date(2026, 10, 22))     # same day, later count wins
+            with db.unit_of_work() as u:
+                self.assertEqual(u.settings.pages(), 15)
+                self.assertEqual(u.settings.pages_history(),
+                                 [(date(2026, 10, 20), 12), (date(2026, 10, 22), 15)])
+
+    def test_clearing_pages_keeps_the_history(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = SqliteDatabase(Path(tmp) / "x.db")
+            db.migrate()
+            with db.unit_of_work() as u:
+                u.settings.set_pages(12, date(2026, 10, 20))
+            with db.unit_of_work() as u:
+                u.settings.set_pages(None, date(2026, 10, 21))
+            with db.unit_of_work() as u:
+                self.assertIsNone(u.settings.pages())
+                self.assertEqual(u.settings.pages_history(), [(date(2026, 10, 20), 12)])
+
     def test_unit_of_work_rolls_back_on_error(self):
         with tempfile.TemporaryDirectory() as tmp:
             db = SqliteDatabase(Path(tmp) / "x.db")
             db.migrate()
             with self.assertRaises(RuntimeError):
                 with db.unit_of_work() as u:
-                    u.settings.set_pages(50)
+                    u.settings.set_pages(50, date(2026, 10, 24))
                     raise RuntimeError("boom")
             with db.unit_of_work() as u:
                 self.assertIsNone(u.settings.pages())
+                self.assertEqual(u.settings.pages_history(), [])
 
 
 if __name__ == "__main__":

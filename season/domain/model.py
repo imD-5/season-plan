@@ -7,7 +7,7 @@ this one depends on nothing.
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
-from datetime import date
+from datetime import date, timedelta
 from enum import StrEnum
 
 from .errors import InvalidInput
@@ -101,6 +101,28 @@ def clean_note(note: str | None) -> str | None:
     if len(note) > MAX_NOTE:
         raise InvalidInput(f"note is longer than {MAX_NOTE} characters")
     return note
+
+
+def check_in_week(day: date, week_start: date) -> date:
+    """A session belongs to its own week's strip: not before the week starts, not after it ends.
+
+    Unlike check_done_on this allows a day the server still thinks is ahead: a phone can hand over
+    the op before this clock catches up, and losing that tick would be worse than an odd date.
+    """
+    week_end = week_start + timedelta(days=6)
+    if day < week_start:
+        raise InvalidInput(f"that day is before the week starts ({week_start:%d %b})")
+    if day > week_end:
+        raise InvalidInput(f"that day is after the week ends ({week_end:%d %b})")
+    return day
+
+
+def check_done_on(day: date, week_start: date, today: date) -> date:
+    """A day the board shows: inside the week, and not in the future."""
+    day = check_in_week(day, week_start)
+    if day > today:
+        raise InvalidInput("that day is in the future")
+    return day
 
 
 def clean_task_text(text: str) -> str:
@@ -297,6 +319,8 @@ class Board:
     problems: ProblemQueue
     pages: int | None
     pages_target: int = PAGES_TARGET
+    pages_history: tuple[tuple[date, int], ...] = ()
+    """Every recorded page count, oldest first: (day, pages). Lets pace see a stall."""
 
     def week_of(self, day: date) -> Week | None:
         if not self.weeks:

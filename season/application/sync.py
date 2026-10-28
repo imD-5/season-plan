@@ -60,6 +60,14 @@ class SetNote:
 
 
 @dataclass(frozen=True, slots=True)
+class SetDate:
+    id: str
+    task: TaskRef
+    slot: int
+    done_on: date
+
+
+@dataclass(frozen=True, slots=True)
 class Add:
     id: str
     client_key: str
@@ -109,7 +117,7 @@ class Skip:
     id: str
 
 
-Op = Mark | Unmark | Restore | SetNote | Add | Remove | Resize | Assign | NewCategory | SetPages | Skip
+Op = Mark | Unmark | Restore | SetNote | SetDate | Add | Remove | Resize | Assign | NewCategory | SetPages | Skip
 
 
 @dataclass(frozen=True, slots=True)
@@ -183,6 +191,8 @@ class ApplySync:
                 a.restore_session(self._task_id(op.task), op.slot, SessionMark(op.done_on, op.problem, op.note))
             case SetNote():
                 a.set_session_note(self._task_id(op.task), op.slot, op.note)
+            case SetDate():
+                a.set_session_date(self._task_id(op.task), op.slot, op.done_on)
             case Add():
                 a.add_task(op.week, op.text, op.sessions, op.hours, client_key=op.client_key)
             case Remove():

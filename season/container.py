@@ -21,6 +21,7 @@ class App:
     unmark_session: uc.UnmarkSession
     restore_session: uc.RestoreSession
     set_session_note: uc.SetSessionNote
+    set_session_date: uc.SetSessionDate
     skip_problem: uc.SkipProblem
     add_task: uc.AddTask
     resize_task: uc.ResizeTask
@@ -52,13 +53,14 @@ def build_app(settings: Settings, *, classifier: Classifier | None = None,
         unmark_session=uc.UnmarkSession(uow),
         restore_session=uc.RestoreSession(uow),
         set_session_note=uc.SetSessionNote(uow),
+        set_session_date=uc.SetSessionDate(uow, clock),
         skip_problem=uc.SkipProblem(uow),
         add_task=uc.AddTask(uow, classifier, policy),
         resize_task=uc.ResizeTask(uow),
         remove_task=uc.RemoveTask(uow),
         assign_category=uc.AssignCategory(uow),
         create_category=uc.CreateCategory(uow, classifier, policy),
-        set_pages=uc.SetPages(uow),
+        set_pages=uc.SetPages(uow, clock),
         seed_plan=uc.SeedPlan(uow),
     )
     return replace(app, apply_sync=ApplySync(uow, app))

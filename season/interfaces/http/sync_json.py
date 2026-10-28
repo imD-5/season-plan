@@ -54,6 +54,8 @@ def parse_op(op: object) -> s.Op:
                              _get(op, "problem", int, optional=True), _get(op, "note", str, optional=True))
         case "note":
             return s.SetNote(op_id, _task(op), _get(op, "slot", int), _get(op, "note", str, optional=True))
+        case "date":
+            return s.SetDate(op_id, _task(op), _get(op, "slot", int), _get(op, "d", date))
         case "add":
             return s.Add(op_id, _get(op, "client_key", str), _get(op, "week", date), _get(op, "text", str),
                          _get(op, "sessions", int, optional=True), _get(op, "hours", float, optional=True))

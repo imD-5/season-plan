@@ -4,11 +4,12 @@ import threading
 import unittest
 import urllib.error
 import urllib.request
+from datetime import date
 from http.server import ThreadingHTTPServer
 
 from season.interfaces.http.server import make_handler
 
-from .support import ScriptedClassifier, make_app, task
+from .support import FixedClock, ScriptedClassifier, make_app, task
 
 
 class HttpTest(unittest.TestCase):
@@ -17,7 +18,7 @@ class HttpTest(unittest.TestCase):
             s.bind(("127.0.0.1", 0))
             self.port = s.getsockname()[1]
         self.app, self.tmp = make_app(ScriptedClassifier({"related work": ("thesis", 0.9), "wax": ("ski", 0.9)}),
-                                      port=self.port)
+                                      clock=FixedClock(date(2026, 10, 14)), port=self.port)
         self.server = ThreadingHTTPServer(("127.0.0.1", self.port), make_handler(self.app))
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
 
@@ -65,6 +66,18 @@ class HttpTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn("Moved 1 task", board["notice"])
 
+    def test_mark_a_box_on_another_day(self):
+        tid = task(self.app, 0, "thesis").id
+        status, board = self.call("POST", f"/api/tasks/{tid}/slots/0", {"d": "2026-10-13"})
+        self.assertEqual(status, 200)
+        slots = next(t for t in board["weeks"][0]["tasks"] if t["id"] == tid)["slots"]
+        self.assertEqual(slots[0]["d"], "2026-10-13")
+
+    def test_mark_refuses_a_day_outside_the_week(self):
+        tid = task(self.app, 0, "thesis").id
+        status, _ = self.call("POST", f"/api/tasks/{tid}/slots/0", {"d": "2026-10-20"})
+        self.assertEqual(status, 400)
+
     def test_same_origin_writes_are_allowed(self):
         tid = task(self.app, 0, "thesis").id
         status, _ = self.call("POST", f"/api/tasks/{tid}/slots/0", headers={"Origin": f"http://127.0.0.1:{self.port}"})
@@ -90,6 +103,20 @@ class HttpTest(unittest.TestCase):
         _, board = self.call("PUT", base + "/note", {"note": None})
         self.assertIsNone(board["weeks"][0]["tasks"][0]["slots"][0]["note"])
         self.assertEqual(self.call("PUT", base + "/note", {"note": 5})[0], 400)
+
+    def test_day_change_over_http(self):
+        tid = task(self.app, 0, "thesis").id
+        base = f"/api/tasks/{tid}/slots/0"
+        self.call("POST", base)
+        self.assertEqual(task(self.app, 0, "thesis").slots[0].done_on, date(2026, 10, 14))
+        status, board = self.call("PUT", base + "/date", {"d": "2026-10-13"})
+        self.assertEqual((status, board["weeks"][0]["tasks"][0]["slots"][0]["d"]), (200, "2026-10-13"))
+        self.assertEqual(board["undo"]["d"], "2026-10-14")           # enough to undo
+        _, board = self.call("PUT", base + "/date", {"d": "2026-10-14"})
+        self.assertEqual(board["weeks"][0]["tasks"][0]["slots"][0]["d"], "2026-10-14")
+        self.assertEqual(self.call("PUT", base + "/date", {"d": "2026-10-15"})[0], 400)   # tomorrow
+        self.assertEqual(self.call("PUT", base + "/date", {"d": "2026-10-05"})[0], 400)   # before the week
+        self.assertEqual(self.call("PUT", base + "/date", {"d": "13 Oct"})[0], 400)
 
     def test_task_size_over_http(self):
         _, board = self.call("POST", "/api/tasks", {"week": "2026-10-12", "text": "Read papers 3x2h"})

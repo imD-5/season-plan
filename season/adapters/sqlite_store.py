@@ -25,7 +25,7 @@ from season.domain.model import (
     Week,
 )
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS weeks (
@@ -84,6 +84,10 @@ CREATE TABLE IF NOT EXISTS applied_ops (
 CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS pages_history (
+  day   TEXT PRIMARY KEY,
+  pages INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS sessions_done_on ON sessions(done_on);
 CREATE INDEX IF NOT EXISTS events_day ON events(day);
@@ -206,8 +210,17 @@ class _Settings:
     def pages(self) -> int | None:
         return self.get("pages")
 
-    def set_pages(self, pages: int | None) -> None:
+    def set_pages(self, pages: int | None, on: date) -> None:
+        """Store the count, and keep one row per day so a stall is visible later."""
         self.put("pages", pages)
+        if pages is not None:
+            self._con.execute("INSERT INTO pages_history(day, pages) VALUES(?, ?) "
+                              "ON CONFLICT(day) DO UPDATE SET pages = excluded.pages",
+                              (on.isoformat(), pages))
+
+    def pages_history(self) -> list[tuple[date, int]]:
+        return [(_d(r["day"]), r["pages"])
+                for r in self._con.execute("SELECT day, pages FROM pages_history ORDER BY day")]
 
 
 class _Tasks:
@@ -273,6 +286,10 @@ class _Tasks:
 
     def set_note(self, task_id: int, slot: int, note: str | None) -> None:
         self._con.execute("UPDATE sessions SET note = ? WHERE task_id = ? AND slot = ?", (note, task_id, slot))
+
+    def set_done_on(self, task_id: int, slot: int, done_on: date) -> None:
+        self._con.execute("UPDATE sessions SET done_on = ? WHERE task_id = ? AND slot = ?",
+                          (done_on.isoformat(), task_id, slot))
 
     def clear_mark(self, task_id: int, slot: int) -> None:
         self._con.execute("DELETE FROM sessions WHERE task_id = ? AND slot = ?", (task_id, slot))

@@ -13,10 +13,14 @@ It runs as a small local server with a SQLite database and opens as its own wind
 - **Weekly menu, no daily tasks.** Each week lists sessions with a rough time per session. Unfinished
   sessions don't carry over.
 - **Day strip.** Shows today, fixed events (lab meetings, holidays, deadlines), and what got done on which day.
-- **Notes.** Ticking a box just ticks it. To add an optional note, right-click a checked box (long-press on the iPhone). Unchecking or editing a note can be undone.
+- **Notes and days.** Ticking a box just ticks it. Right-click a checked box (long-press on the iPhone) to change **the day it was done** or add an optional note. Unchecking, editing a note, or moving a session to another day can be undone.
+- **Log into a day.** Click a day in the strip and ticking any box records it on that day instead of today. Click the day again to stop.
 - **Auto-sorted tasks.** New tasks are sorted into types by [Jev](https://docs.typesafe.ai) (TypeSafe AI).
   If it's unsure or offline, the task goes to *other*. Types can be changed or created from the board.
 - **LeetCode queue.** Follows Top Interview 150 and records which problem each session was.
+- **Pace.** Compares the pages still to write with the thesis boxes the coming weeks still hold, at the
+  rate actually achieved, and says how many boxes short the plan is. Quiet when the plan covers the
+  deadline. It also notices pages that stop moving.
 - **Reminders.** Short Monday / Wednesday / Friday / Sunday summaries via a CLI command (I run these from
   a scheduler).
 

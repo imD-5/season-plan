@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from season.application.sync import SyncResult
 from season.domain.model import Board, Category, SessionMark, Task, Week
+from season.domain.pace import pace_for
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +56,17 @@ def _category(c: Category) -> dict:
     return {"key": c.key, "label": c.label, "description": c.description, "builtin": c.builtin}
 
 
+def _pace(board: Board) -> dict | None:
+    p = pace_for(board)
+    if p is None:
+        return None
+    return {"status": p.status.value, "line": p.line(), "deadline": p.deadline.isoformat(),
+            "days_left": p.days_left, "pages_left": p.pages_left, "per_week": round(p.pages_per_week, 1),
+            "hours_left": p.hours_left, "estimate": p.estimate, "short": p.sessions_short,
+            "boxes_per_week": p.boxes_per_week,
+            "stalled": p.stalled, "stalled_days": p.stalled_days}
+
+
 def board_json(board: Board, reply: Reply | None = None) -> dict:
     events: dict[str, list] = {}
     for e in board.events:
@@ -64,6 +76,7 @@ def board_json(board: Board, reply: Reply | None = None) -> dict:
         "today": board.today.isoformat(),
         "pages": board.pages,
         "pages_target": board.pages_target,
+        "pace": _pace(board),
         "problem": None if current is None else {"number": current.number, "title": current.title},
         # the next problems too, so an offline phone can advance the list itself
         "upcoming": [{"number": p.number, "title": p.title}
